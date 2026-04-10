@@ -3,6 +3,10 @@
 > **Integrated project** — Web Programming (WP1) + System Security (SEC-PRJ-2_23)  
 > Platform: Raspberry Pi · Docker · Python/Flask · SQLite
 
+## Repository Description
+
+Production-minded Raspberry Pi captive portal built with Flask, Docker, and SQLite, enhanced with federated key-shard exchange to gate secure filesystem access. The platform combines user/device access control, administrative operations, and encrypted storage lifecycle management in a single reproducible IoT security lab.
+
 ---
 
 ## Overview
