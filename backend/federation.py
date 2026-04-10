@@ -53,10 +53,12 @@ except ImportError:
 
 try:
     import requests as _http
+    from requests.exceptions import RequestException as _RequestException
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
     _http = None
+    _RequestException = OSError  # type: ignore[assignment,misc]
 
 
 class FederationAgent:
@@ -261,7 +263,7 @@ class FederationAgent:
 
             self._create_demo_secure_content()
             logger.info("Secure partition mounted successfully for node %s", self.node_id)
-        except Exception as exc:  # pylint: disable=broad-except
+        except OSError as exc:
             logger.error("Failed to mount secure partition: %s", exc)
 
     def _create_demo_secure_content(self) -> None:
@@ -350,7 +352,7 @@ class FederationAgent:
                 addr = f"http://{addr}"
             try:
                 self._exchange_shard_with(addr)
-            except Exception as exc:  # pylint: disable=broad-except
+            except (OSError, _RequestException) as exc:
                 logger.warning("Could not contact neighbour %s: %s", addr, exc)
 
         if not self._is_mounted:

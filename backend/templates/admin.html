@@ -408,7 +408,7 @@
         const sizeKB = item.size < 1024 ? item.size + ' B' : Math.round(item.size / 1024) + ' KB';
         html += '<li class="py-1 d-flex align-items-center gap-2">'
               + '<i class="bi bi-file-earmark-text text-primary"></i>'
-              + '<a href="/api/files/' + encodeURIComponent(item.path).replace(/%2F/g, '/') + '" target="_blank" class="text-decoration-none">'
+              + '<a href="/api/files/' + item.path.split('/').map(encodeURIComponent).join('/') + '" target="_blank" class="text-decoration-none">'
               + item.name + '</a>'
               + '<small class="text-muted">(' + sizeKB + ')</small>'
               + '</li>';
@@ -438,10 +438,16 @@
       });
   };
 
-  // Load files when the System tab is shown
+  // Load files on first visit to the System tab, not on every activation
   const systemTabBtn = document.querySelector('[data-bs-target="#tabSystem"]');
   if (systemTabBtn) {
-    systemTabBtn.addEventListener('shown.bs.tab', window.adminLoadFiles);
+    systemTabBtn.addEventListener('shown.bs.tab', function() {
+      const panel = document.getElementById('admin-files-panel');
+      // Only fetch if still showing the initial placeholder
+      if (panel && panel.querySelector('i.bi-hourglass-split')) {
+        window.adminLoadFiles();
+      }
+    });
   }
 })();
 </script>

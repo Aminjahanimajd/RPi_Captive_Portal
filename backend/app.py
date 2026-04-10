@@ -458,22 +458,6 @@ def api_status():
 _SECURE_DIR = Path(os.environ.get("DATA_DIR", "/data")) / "secure_store"
 
 
-def _safe_secure_path(rel: str) -> Path | None:
-    """
-    Resolve *rel* relative to the secure store root and verify it does not
-    escape that directory (path-traversal guard).
-
-    Returns the resolved Path on success, or None if the path is invalid.
-    """
-    try:
-        target = (_SECURE_DIR / rel).resolve()
-        _SECURE_DIR.resolve()
-        target.relative_to(_SECURE_DIR.resolve())
-        return target
-    except (ValueError, Exception):  # pylint: disable=broad-except
-        return None
-
-
 @app.route("/api/files")
 @login_required
 def list_secure_files():
@@ -535,8 +519,24 @@ def get_secure_file(filepath: str):
     if any(part.startswith(".") for part in Path(filepath).parts):
         return jsonify({"error": "File not found"}), 404
 
-    target = _safe_secure_path(filepath)
-    if target is None or not target.exists() or not target.is_file():
+    try:
+        secure_root = _SECURE_DIR.resolve()
+        # Strip leading slashes to prevent absolute-path injection via Path(/)
+        clean_rel = filepath.lstrip("/")
+        if not clean_rel:
+            return jsonify({"error": "File not found"}), 404
+        candidate = (secure_root / clean_rel).resolve()
+        # relative_to() raises ValueError if candidate escapes secure_root.
+        # Capturing its return value lets us reconstruct a path from validated
+        # components only, keeping static-analysis tools happy.
+        validated_rel = candidate.relative_to(secure_root)
+    except (ValueError, OSError):
+        return jsonify({"error": "File not found"}), 404
+
+    # Re-build from the validated relative portion (no longer tainted by user input)
+    target = secure_root / validated_rel
+
+    if not target.exists() or not target.is_file():
         return jsonify({"error": "File not found"}), 404
 
     suffix = target.suffix.lower()

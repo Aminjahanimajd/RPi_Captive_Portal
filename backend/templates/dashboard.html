@@ -223,7 +223,7 @@ function renderTree(items, indent) {
       const sizeKB = item.size < 1024 ? item.size + ' B' : Math.round(item.size / 1024) + ' KB';
       html += '<li class="py-1 d-flex align-items-center gap-2">'
             + '<i class="bi bi-file-earmark-text text-primary"></i>'
-            + '<a href="/api/files/' + encodeURIComponent(item.path).replace(/%2F/g, '/') + '" target="_blank" class="text-decoration-none">'
+            + '<a href="/api/files/' + item.path.split('/').map(encodeURIComponent).join('/') + '" target="_blank" class="text-decoration-none">'
             + item.name + '</a>'
             + '<small class="text-muted">(' + sizeKB + ')</small>'
             + '</li>';
