@@ -458,6 +458,41 @@ def api_status():
 _SECURE_DIR = Path(os.environ.get("DATA_DIR", "/data")) / "secure_store"
 
 
+def _validate_secure_file_access() -> tuple[sqlite3.Row | None, sqlite3.Row | None, tuple[dict, int] | None]:
+    """
+    Enforce access policy for secure file APIs.
+
+    Required conditions:
+    - Authenticated session (already enforced by @login_required)
+    - Active user account
+    - Device is known and authorised
+    - Secure partition is mounted
+    """
+    db = get_db()
+    user = db.execute(
+        "SELECT * FROM users WHERE id = ?", (session.get("user_id"),)
+    ).fetchone()
+    if not user:
+        return None, None, ({"error": "User not found"}, 404)
+    if not user["is_active"]:
+        return None, None, ({"error": "User account is inactive"}, 403)
+
+    if not federation.get_status()["is_mounted"]:
+        return None, None, ({"error": "Secure partition is not mounted"}, 503)
+
+    mac = user["mac_address"] or _get_client_mac(request)
+    if not mac:
+        return None, None, ({"error": "No device associated with this account"}, 403)
+
+    device = db.execute(
+        "SELECT * FROM devices WHERE mac_address = ?", (mac,)
+    ).fetchone()
+    if not device or not device["is_authorized"]:
+        return None, None, ({"error": "Device is not authorised"}, 403)
+
+    return user, device, None
+
+
 @app.route("/api/files")
 @login_required
 def list_secure_files():
@@ -468,8 +503,9 @@ def list_secure_files():
     any files are accessible.  Returns a nested JSON structure representing the
     folder tree inside *secure_store/*.
     """
-    if not federation.get_status()["is_mounted"]:
-        return jsonify({"error": "Secure partition is not mounted"}), 503
+    user, device, error = _validate_secure_file_access()
+    if error:
+        return jsonify(error[0]), error[1]
 
     def _tree(directory: Path) -> list:
         entries = []
@@ -498,6 +534,9 @@ def list_secure_files():
             pass
         return entries
 
+    db = get_db()
+    _log_access(db, device["mac_address"], "secure_list", request.remote_addr)
+    db.commit()
     return jsonify({"files": _tree(_SECURE_DIR), "node_id": NODE_ID})
 
 
@@ -512,8 +551,9 @@ def get_secure_file(filepath: str):
     Access is restricted to authenticated users and requires the secure
     partition to be mounted.
     """
-    if not federation.get_status()["is_mounted"]:
-        return jsonify({"error": "Secure partition is not mounted"}), 503
+    user, device, error = _validate_secure_file_access()
+    if error:
+        return jsonify(error[0]), error[1]
 
     # Reject any attempt to access hidden/marker files directly
     if any(part.startswith(".") for part in Path(filepath).parts):
@@ -538,6 +578,10 @@ def get_secure_file(filepath: str):
 
     if not target.exists() or not target.is_file():
         return jsonify({"error": "File not found"}), 404
+
+    db = get_db()
+    _log_access(db, device["mac_address"], "secure_download", request.remote_addr)
+    db.commit()
 
     suffix = target.suffix.lower()
     text_types = {".txt", ".log", ".json", ".md", ".csv"}
