@@ -1,0 +1,327 @@
+PROJECT 0 TO 100 LEARNING GUIDE
+WiFi Captive Portal + Federated Filesystem Security
+
+This file explains what we are building, why we use each part, and what you must understand.
+It is written from beginner level to practical implementation level.
+
+===============================================================================
+0) PROJECT IN ONE SIMPLE SENTENCE
+===============================================================================
+We built a Raspberry Pi WiFi captive portal where users must register/login first,
+and where secure data access depends on trusted federation nodes exchanging key shards.
+
+
+===============================================================================
+1) Why we used Docker
+===============================================================================
+What Docker is:
+- Docker runs your app inside containers (portable mini-environments).
+
+Why we use it in this project:
+- Same behavior on your laptop and Raspberry Pi.
+- Easy to run two nodes (portal + neighbor) for federation demo.
+- Easy dependency management (Python, crypto libs, Flask, etc.).
+- Fast setup: one command (docker compose up --build).
+
+What problem it solves:
+- "Works on my machine" issue.
+- Manual package conflicts.
+- Difficult multi-node testing.
+
+
+===============================================================================
+2) What is a captive portal
+===============================================================================
+A captive portal is a login/register page shown before full internet/network access.
+
+In this project:
+- Device connects to Pi hotspot.
+- HTTP/HTTPS requests are redirected to portal page.
+- User registers/logs in.
+- Device becomes authorized.
+
+Real-world examples:
+- Hotel WiFi, airport WiFi, campus guest WiFi.
+
+
+===============================================================================
+3) What is our goal and purpose
+===============================================================================
+Main goal:
+- Combine web-programming requirements and system-security requirements in one system.
+
+Purpose:
+- Web side: authentication, admin management, APIs, database, UI.
+- Security side: encrypted secure storage + federation-based trust for key sharing.
+
+Educational purpose:
+- Learn full-stack web development + applied security + network control on Raspberry Pi.
+
+
+===============================================================================
+4) What is RSA-2048 key pair and why we use it
+===============================================================================
+RSA-2048 key pair:
+- Private key (kept secret by node).
+- Public key (shared to others).
+
+Why use it here:
+- Node identity: prove which node is talking.
+- Foundation for trusted communication between federation nodes.
+
+In your code:
+- Each node loads or generates RSA key pair on startup.
+- Public key is exposed in /federation/info.
+
+
+===============================================================================
+5) What is 32-byte AES-256 master key, why split, what are shards
+===============================================================================
+32-byte AES-256 master key:
+- A random 256-bit symmetric key used for encryption/decryption of secure partition logic.
+
+Why we use AES-256:
+- Strong and fast encryption standard.
+
+What are shards:
+- Smaller key shares created from the master key.
+- In this project, shards are generated with XOR-based split logic.
+
+Why split key into shards:
+- One node should not hold full trust alone.
+- Security and federation concept: require collaboration.
+
+
+===============================================================================
+6) What is federation, how it works, why we use it
+===============================================================================
+Federation means:
+- Multiple nodes cooperate with trust rules.
+
+How it works here:
+- Nodes know neighbors (from NEIGHBOR_NODES and admin federation_nodes table).
+- Trusted nodes exchange shards.
+- Node reconstructs key when enough shard data is available.
+
+Why use federation:
+- Matches SEC-PRJ requirement (edge federation behavior).
+- Improves security model compared with isolated single-node trust.
+
+
+===============================================================================
+7) How and why shards exchange, how key reconstruction works
+===============================================================================
+How exchange works:
+- During bootstrap, node sends shard to neighbor endpoint:
+  /federation/provide-shard
+- Trusted check happens using federation_nodes table (is_trusted=1 required).
+
+Why exchange:
+- Node needs external shard(s) to reconstruct key in federated model.
+
+Reconstruction method in this code:
+- XOR local shard + received shard(s) -> reconstructed master key.
+
+Important note:
+- Current implementation uses XOR sharing (good for demo/education).
+- Production-grade threshold sharing should use Shamir Secret Sharing.
+
+
+===============================================================================
+8) Why and how we mount secure partition, why it exists, applications
+===============================================================================
+Why secure partition exists:
+- Keep sensitive files encrypted and protected.
+
+How mount works in this project:
+- Demo mode (Docker): simulated secure mount using encrypted marker file.
+- Real Pi mode: scripts/mount_secure_fs.sh can create/open LUKS encrypted partition.
+
+Why mount is needed:
+- Encrypted storage must be unlocked before use.
+- Locked state protects data at rest.
+
+Possible applications of secure partition:
+- IoT device secrets.
+- Access logs and audit data.
+- Private configs and keys.
+- Sensitive documents/records in smart-building systems.
+
+
+===============================================================================
+9) What is AES-GCM encrypted marker and why used
+===============================================================================
+AES-GCM encrypted marker:
+- A small encrypted file (marker) written after successful key reconstruction.
+
+Why used:
+- In Docker demo, it proves secure partition activation flow worked.
+- It is a cryptographic proof-of-success without needing real disk mount every time.
+
+
+===============================================================================
+10) What .sh script files do and why used
+===============================================================================
+scripts/setup_hotspot.sh
+- Installs hostapd + dnsmasq.
+- Configures Raspberry Pi as WiFi hotspot.
+- Sets static AP IP and DHCP range.
+- Enables IP forwarding.
+Why: creates captive portal network.
+
+scripts/setup_iptables.sh
+- Adds NAT/redirection rules.
+- Redirects unauthenticated clients to portal.
+- Supports authorize/revoke MAC behavior.
+Why: enforces captive portal behavior at network layer.
+
+scripts/mount_secure_fs.sh
+- Manages secure partition lifecycle.
+- create: initialize LUKS encrypted partition.
+- open: unlock and mount partition.
+- close: unmount and lock.
+- status: show current state.
+Why: real secure storage operations on Raspberry Pi.
+
+
+===============================================================================
+11) In admin panel, what should administrator check
+===============================================================================
+Users tab:
+- New registrations.
+- Active/deactivated status.
+- Correct user roles (admin/user).
+
+Devices tab:
+- Which MAC addresses connected.
+- Authorized vs revoked devices.
+- Remove suspicious devices.
+
+Federation Nodes tab:
+- Correct node IDs, hostnames, IP/port.
+- Trust only known nodes.
+- Remove unknown nodes.
+
+System tab / status views:
+- is_mounted state.
+- shards_collected count.
+- has_master_key state.
+- Neighbor connectivity.
+
+
+===============================================================================
+12) What are federation nodes, and node-2 manual add explanation
+===============================================================================
+Federation nodes are peer devices/containers that participate in shard sharing.
+
+In your local Docker demo:
+- portal container is node-1.
+- neighbor container is node-2.
+
+"Node-2 can be added manually in Federation Nodes tab" means:
+- Admin inserts node-2 metadata into database from UI.
+- Then marks it trusted.
+- After trust is enabled, shard API calls from node-2 are accepted.
+
+Why manual add is useful:
+- Gives administrator control over which nodes are trusted.
+- Prevents automatic trust of unknown peers.
+
+
+===============================================================================
+13) What are federation APIs and each meaning
+===============================================================================
+From your backend app:
+
+GET /federation/info
+- Returns node identity info (node_id, public_key, version).
+- Used by peers/admin to inspect node identity.
+
+POST /federation/request-shard
+- Trusted node asks this node for shard assigned to requester.
+- Denied if requester is not trusted.
+
+POST /federation/provide-shard
+- Trusted node sends a shard to this node.
+- This node stores shard and tries key reconstruction.
+
+GET /federation/mount-status
+- Returns federation secure status (for logged-in user).
+
+GET /api/status
+- General health endpoint: running state + federation status + timestamp.
+
+
+===============================================================================
+HOW COMPLETE PROJECT FLOW WORKS (END-TO-END)
+===============================================================================
+1) Admin starts system (Docker or Pi deployment).
+2) Node initializes keys/shards and starts federation bootstrap.
+3) Client connects to hotspot.
+4) Client is redirected to portal page.
+5) Client registers/logs in.
+6) Device/user state is saved in DB.
+7) Admin can authorize/revoke devices and manage users.
+8) Federation nodes exchange shards (trusted only).
+9) Master key is reconstructed.
+10) Secure partition is mounted (real or simulated).
+11) System status shows mount/federation health.
+
+
+===============================================================================
+WHAT YOU MUST LEARN (KNOWLEDGE REQUIREMENTS)
+===============================================================================
+Beginner level:
+- HTTP basics (GET/POST), JSON, sessions.
+- SQL basics (tables, CRUD, relationships).
+- Linux basics (services, permissions, shell scripts).
+
+Intermediate level:
+- Flask routing and middleware-like auth logic.
+- Docker images, containers, volumes, docker-compose.
+- Raspberry Pi network setup (hostapd, dnsmasq, iptables).
+
+Security level:
+- Password hashing.
+- Symmetric encryption (AES) and AEAD mode (GCM).
+- Public/private key basics (RSA).
+- Key splitting concepts and trust model.
+
+System level:
+- Captive portal traffic redirection.
+- Device authorization lifecycle.
+- LUKS encrypted partition workflow.
+
+
+===============================================================================
+IMPORTANT LIMITATIONS (HONEST ENGINEERING NOTES)
+===============================================================================
+- Current shard scheme is XOR-based educational model, not full threshold cryptography.
+- Trust verification currently depends heavily on admin-managed trusted node list.
+- Demo mount in Docker uses encrypted marker file (not full disk mount).
+- Production setup needs stronger mutual auth, key rotation, and hardened secrets handling.
+
+
+===============================================================================
+NEXT LEARNING ORDER (RECOMMENDED)
+===============================================================================
+1) Read backend/app.py to understand web flow and admin logic.
+2) Read backend/federation.py to understand keys, shards, and bootstrap.
+3) Run docker compose demo and test all admin tabs.
+4) Practice federation APIs with curl.
+5) Move to Raspberry Pi scripts and test hotspot + iptables.
+6) Test real LUKS flow on non-critical partition.
+
+
+===============================================================================
+QUICK VOCABULARY
+===============================================================================
+Captive portal: login gate before access.
+Federation: trusted node collaboration.
+Shard: one piece/share of key data.
+Master key: original encryption key.
+Mount: attach storage so OS can read/write.
+LUKS: Linux disk encryption system.
+AES-GCM: authenticated encryption mode.
+
+End of guide.
