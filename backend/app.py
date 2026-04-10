@@ -26,6 +26,7 @@ import sqlite3
 import threading
 from datetime import datetime
 from functools import wraps
+from pathlib import Path
 
 from flask import (
     Flask,
@@ -35,6 +36,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -449,6 +451,98 @@ def api_status():
             "timestamp": datetime.utcnow().isoformat() + "Z",
         }
     )
+
+
+# ── Secure File API ────────────────────────────────────────────────────────
+
+_SECURE_DIR = Path(os.environ.get("DATA_DIR", "/data")) / "secure_store"
+
+
+def _safe_secure_path(rel: str) -> Path | None:
+    """
+    Resolve *rel* relative to the secure store root and verify it does not
+    escape that directory (path-traversal guard).
+
+    Returns the resolved Path on success, or None if the path is invalid.
+    """
+    try:
+        target = (_SECURE_DIR / rel).resolve()
+        _SECURE_DIR.resolve()
+        target.relative_to(_SECURE_DIR.resolve())
+        return target
+    except (ValueError, Exception):  # pylint: disable=broad-except
+        return None
+
+
+@app.route("/api/files")
+@login_required
+def list_secure_files():
+    """
+    List files available in the secure partition.
+
+    The secure partition must be mounted (federation bootstrap complete) before
+    any files are accessible.  Returns a nested JSON structure representing the
+    folder tree inside *secure_store/*.
+    """
+    if not federation.get_status()["is_mounted"]:
+        return jsonify({"error": "Secure partition is not mounted"}), 503
+
+    def _tree(directory: Path) -> list:
+        entries = []
+        try:
+            for item in sorted(directory.iterdir()):
+                if item.name.startswith("."):
+                    continue  # skip hidden marker files
+                if item.is_dir():
+                    entries.append(
+                        {
+                            "name": item.name,
+                            "type": "directory",
+                            "children": _tree(item),
+                        }
+                    )
+                elif item.is_file():
+                    entries.append(
+                        {
+                            "name": item.name,
+                            "type": "file",
+                            "size": item.stat().st_size,
+                            "path": str(item.relative_to(_SECURE_DIR)),
+                        }
+                    )
+        except PermissionError:
+            pass
+        return entries
+
+    return jsonify({"files": _tree(_SECURE_DIR), "node_id": NODE_ID})
+
+
+@app.route("/api/files/<path:filepath>")
+@login_required
+def get_secure_file(filepath: str):
+    """
+    Download a single file from the secure partition.
+
+    Only text files (plain-text, JSON) are served inline; everything else is
+    sent as an attachment.  Hidden files (starting with '.') are never served.
+    Access is restricted to authenticated users and requires the secure
+    partition to be mounted.
+    """
+    if not federation.get_status()["is_mounted"]:
+        return jsonify({"error": "Secure partition is not mounted"}), 503
+
+    # Reject any attempt to access hidden/marker files directly
+    if any(part.startswith(".") for part in Path(filepath).parts):
+        return jsonify({"error": "File not found"}), 404
+
+    target = _safe_secure_path(filepath)
+    if target is None or not target.exists() or not target.is_file():
+        return jsonify({"error": "File not found"}), 404
+
+    suffix = target.suffix.lower()
+    text_types = {".txt", ".log", ".json", ".md", ".csv"}
+    as_attachment = suffix not in text_types
+    return send_file(target, as_attachment=as_attachment)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
