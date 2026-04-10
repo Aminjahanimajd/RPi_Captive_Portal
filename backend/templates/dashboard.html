@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — {{ user['username'] }}{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-primary">
+  <div class="container">
+    <span class="navbar-brand fw-bold"><i class="bi bi-wifi me-2"></i>WiFi Portal</span>
+    <div class="d-flex align-items-center gap-3">
+      <span class="text-white-50 small">
+        <i class="bi bi-person-circle me-1"></i>{{ session['username'] }}
+      </span>
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+  <!-- Welcome Banner -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 bg-primary text-white shadow">
+        <div class="card-body d-flex align-items-center gap-4 py-4">
+          <div class="display-4"><i class="bi bi-person-circle"></i></div>
+          <div>
+            <h4 class="mb-1 fw-bold">Welcome back, {{ user['username'] }}!</h4>
+            <p class="mb-0 text-white-75">
+              {% if device and device['is_authorized'] %}
+                <i class="bi bi-check-circle-fill me-1 text-success-emphasis"></i>
+                Your device is <strong>authorised</strong> and connected to the network.
+              {% else %}
+                <i class="bi bi-clock me-1"></i>
+                Your device is pending authorisation by an administrator.
+              {% endif %}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Device Info -->
+    <div class="col-md-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-laptop me-2 text-primary"></i>Device Information
+        </div>
+        <div class="card-body">
+          {% if device %}
+          <table class="table table-sm mb-0">
+            <tbody>
+              <tr>
+                <td class="text-muted w-40">MAC Address</td>
+                <td><code>{{ device['mac_address'] }}</code></td>
+              </tr>
+              <tr>
+                <td class="text-muted">IP Address</td>
+                <td><code>{{ device['ip_address'] or '—' }}</code></td>
+              </tr>
+              <tr>
+                <td class="text-muted">Status</td>
+                <td>
+                  {% if device['is_authorized'] %}
+                  <span class="badge bg-success"><i class="bi bi-check me-1"></i>Authorised</span>
+                  {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Pending</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td class="text-muted">First Seen</td>
+                <td>{{ device['first_seen'] }}</td>
+              </tr>
+              <tr>
+                <td class="text-muted">Last Seen</td>
+                <td>{{ device['last_seen'] }}</td>
+              </tr>
+            </tbody>
+          </table>
+          {% else %}
+          <p class="text-muted mb-0">No device record found for your account.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Account Info -->
+    <div class="col-md-6">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-person me-2 text-primary"></i>Account Details
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tbody>
+              <tr>
+                <td class="text-muted w-40">Username</td>
+                <td>{{ user['username'] }}</td>
+              </tr>
+              <tr>
+                <td class="text-muted">Email</td>
+                <td>{{ user['email'] or '—' }}</td>
+              </tr>
+              <tr>
+                <td class="text-muted">Role</td>
+                <td><span class="badge bg-secondary">{{ user['role'] }}</span></td>
+              </tr>
+              <tr>
+                <td class="text-muted">Account Status</td>
+                <td>
+                  {% if user['is_active'] %}
+                  <span class="badge bg-success">Active</span>
+                  {% else %}
+                  <span class="badge bg-danger">Inactive</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td class="text-muted">Registered</td>
+                <td>{{ user['created_at'] }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Federation / Security Status -->
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-shield-lock me-2 text-primary"></i>
+          Federated Filesystem Security — Node <code>{{ node_id }}</code>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-sm-4">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+                {% if fed_status['is_mounted'] %}
+                <i class="bi bi-unlock-fill fs-2 text-success"></i>
+                <div>
+                  <div class="fw-semibold text-success">Partition Mounted</div>
+                  <small class="text-muted">Secure storage is active</small>
+                </div>
+                {% else %}
+                <i class="bi bi-lock-fill fs-2 text-warning"></i>
+                <div>
+                  <div class="fw-semibold text-warning">Partition Locked</div>
+                  <small class="text-muted">Waiting for key reconstruction</small>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+                <i class="bi bi-puzzle-fill fs-2 text-primary"></i>
+                <div>
+                  <div class="fw-semibold">Key Shards Collected</div>
+                  <small class="text-muted">{{ fed_status['shards_collected'] }} from neighbours</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+                {% if fed_status['has_master_key'] %}
+                <i class="bi bi-key-fill fs-2 text-success"></i>
+                <div>
+                  <div class="fw-semibold text-success">Master Key Ready</div>
+                  <small class="text-muted">Filesystem encryption active</small>
+                </div>
+                {% else %}
+                <i class="bi bi-key fs-2 text-secondary"></i>
+                <div>
+                  <div class="fw-semibold text-secondary">No Master Key</div>
+                  <small class="text-muted">Federation bootstrap pending</small>
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

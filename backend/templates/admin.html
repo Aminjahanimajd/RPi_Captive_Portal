@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel — WiFi Captive Portal{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-dark">
+  <div class="container-fluid">
+    <span class="navbar-brand fw-bold">
+      <i class="bi bi-shield-lock me-2"></i>Admin Panel
+    </span>
+    <div class="d-flex align-items-center gap-3">
+      <span class="text-white-50 small">Node: <code class="text-white">{{ node_id }}</code></span>
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid py-4 px-4">
+
+  <!-- Status cards row -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+      <div class="card text-bg-primary shadow-sm">
+        <div class="card-body d-flex align-items-center gap-3">
+          <i class="bi bi-people-fill fs-2"></i>
+          <div>
+            <div class="h4 mb-0 fw-bold">{{ users | length }}</div>
+            <small>Registered Users</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card text-bg-success shadow-sm">
+        <div class="card-body d-flex align-items-center gap-3">
+          <i class="bi bi-laptop fs-2"></i>
+          <div>
+            <div class="h4 mb-0 fw-bold">{{ devices | selectattr('is_authorized', 'equalto', 1) | list | length }}</div>
+            <small>Authorised Devices</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card text-bg-info shadow-sm">
+        <div class="card-body d-flex align-items-center gap-3">
+          <i class="bi bi-diagram-3-fill fs-2"></i>
+          <div>
+            <div class="h4 mb-0 fw-bold">{{ nodes | length }}</div>
+            <small>Federation Nodes</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card shadow-sm {% if fed_status['is_mounted'] %}text-bg-success{% else %}text-bg-warning{% endif %}">
+        <div class="card-body d-flex align-items-center gap-3">
+          <i class="bi bi-{% if fed_status['is_mounted'] %}unlock{% else %}lock{% endif %}-fill fs-2"></i>
+          <div>
+            <div class="h6 mb-0 fw-bold">Secure Partition</div>
+            <small>{% if fed_status['is_mounted'] %}Mounted{% else %}Locked{% endif %}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs mb-0" id="adminTabs">
+    <li class="nav-item">
+      <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabUsers">
+        <i class="bi bi-people me-1"></i>Users
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDevices">
+        <i class="bi bi-laptop me-1"></i>Devices
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabNodes">
+        <i class="bi bi-diagram-3 me-1"></i>Federation Nodes
+      </button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabSystem">
+        <i class="bi bi-gear me-1"></i>System
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content bg-white border border-top-0 rounded-bottom p-4 shadow-sm">
+
+    <!-- ── Users Tab ── -->
+    <div class="tab-pane fade show active" id="tabUsers">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Registered Users</h5>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>#</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>MAC Address</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Registered</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr id="user-row-{{ u['id'] }}">
+              <td>{{ u['id'] }}</td>
+              <td class="fw-semibold">{{ u['username'] }}</td>
+              <td>{{ u['email'] or '—' }}</td>
+              <td><code>{{ u['mac_address'] or '—' }}</code></td>
+              <td>
+                <span class="badge {% if u['role'] == 'admin' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {{ u['role'] }}
+                </span>
+              </td>
+              <td>
+                <span class="badge {% if u['is_active'] %}bg-success{% else %}bg-danger{% endif %}">
+                  {{ 'Active' if u['is_active'] else 'Inactive' }}
+                </span>
+              </td>
+              <td><small>{{ u['created_at'] }}</small></td>
+              <td class="text-end">
+                {% if u['role'] != 'admin' %}
+                <button class="btn btn-sm btn-outline-warning me-1"
+                        onclick="toggleUser({{ u['id'] }}, {{ u['is_active'] }})"
+                        title="{{ 'Deactivate' if u['is_active'] else 'Activate' }}">
+                  <i class="bi bi-{{ 'pause' if u['is_active'] else 'play' }}-fill"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="deleteUser({{ u['id'] }}, '{{ u['username'] }}')"
+                        title="Delete user">
+                  <i class="bi bi-trash"></i>
+                </button>
+                {% else %}
+                <span class="text-muted small">protected</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted py-4">No users registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Devices Tab ── -->
+    <div class="tab-pane fade" id="tabDevices">
+      <h5 class="mb-3">Connected Devices</h5>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>MAC Address</th>
+              <th>Hostname</th>
+              <th>IP Address</th>
+              <th>User</th>
+              <th>Status</th>
+              <th>Last Seen</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in devices %}
+            <tr id="device-row-{{ loop.index }}">
+              <td><code>{{ d['mac_address'] }}</code></td>
+              <td>{{ d['hostname'] or '—' }}</td>
+              <td><code>{{ d['ip_address'] or '—' }}</code></td>
+              <td>{{ d['username'] or '—' }}</td>
+              <td>
+                <span class="badge {% if d['is_authorized'] %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                  {{ 'Authorised' if d['is_authorized'] else 'Pending' }}
+                </span>
+              </td>
+              <td><small>{{ d['last_seen'] }}</small></td>
+              <td class="text-end">
+                {% if d['is_authorized'] %}
+                <button class="btn btn-sm btn-outline-warning me-1"
+                        onclick="revokeDevice('{{ d['mac_address'] }}')"
+                        title="Revoke access">
+                  <i class="bi bi-x-circle"></i>
+                </button>
+                {% else %}
+                <button class="btn btn-sm btn-outline-success me-1"
+                        onclick="authorizeDevice('{{ d['mac_address'] }}')"
+                        title="Authorise device">
+                  <i class="bi bi-check-circle"></i>
+                </button>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="deleteDevice('{{ d['mac_address'] }}')"
+                        title="Remove device">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No devices registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Federation Nodes Tab ── -->
+    <div class="tab-pane fade" id="tabNodes">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Federation Nodes</h5>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addNodeModal">
+          <i class="bi bi-plus-lg me-1"></i>Add Node
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Node ID</th>
+              <th>Hostname</th>
+              <th>IP Address</th>
+              <th>Port</th>
+              <th>Trust</th>
+              <th>Last Seen</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for n in nodes %}
+            <tr id="node-row-{{ loop.index }}">
+              <td><code>{{ n['node_id'] }}</code></td>
+              <td>{{ n['hostname'] }}</td>
+              <td><code>{{ n['ip_address'] }}</code></td>
+              <td>{{ n['port'] }}</td>
+              <td>
+                <span class="badge {% if n['is_trusted'] %}bg-success{% else %}bg-secondary{% endif %}">
+                  {{ 'Trusted' if n['is_trusted'] else 'Untrusted' }}
+                </span>
+              </td>
+              <td><small>{{ n['last_seen'] }}</small></td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-{% if n['is_trusted'] %}warning{% else %}success{% endif %} me-1"
+                        onclick="toggleNodeTrust('{{ n['node_id'] }}', {{ n['is_trusted'] }})"
+                        title="{{ 'Revoke trust' if n['is_trusted'] else 'Grant trust' }}">
+                  <i class="bi bi-{% if n['is_trusted'] %}shield-x{% else %}shield-check{% endif %}"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="deleteNode('{{ n['node_id'] }}')"
+                        title="Remove node">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No federation nodes registered yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── System Tab ── -->
+    <div class="tab-pane fade" id="tabSystem">
+      <h5 class="mb-3">System &amp; Federation Status</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card border-0 bg-light">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-diagram-3 me-2 text-primary"></i>Federation</h6>
+              <table class="table table-sm mb-0">
+                <tr><td class="text-muted">This Node</td><td><code>{{ fed_status['node_id'] }}</code></td></tr>
+                <tr><td class="text-muted">Shards Collected</td><td>{{ fed_status['shards_collected'] }}</td></tr>
+                <tr>
+                  <td class="text-muted">Master Key</td>
+                  <td>
+                    {% if fed_status['has_master_key'] %}
+                    <span class="badge bg-success">Ready</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Not Ready</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-muted">Neighbours Configured</td>
+                  <td>{{ fed_status['neighbours'] | length }}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="card border-0 bg-light">
+            <div class="card-body">
+              <h6 class="fw-semibold"><i class="bi bi-hdd-rack me-2 text-primary"></i>Secure Partition</h6>
+              <table class="table table-sm mb-0">
+                <tr>
+                  <td class="text-muted">Status</td>
+                  <td>
+                    {% if fed_status['is_mounted'] %}
+                    <span class="badge bg-success"><i class="bi bi-unlock me-1"></i>Mounted</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-lock me-1"></i>Locked</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                <tr>
+                  <td class="text-muted">Technology</td>
+                  <td>LUKS AES-256 (demo: AES-GCM)</td>
+                </tr>
+                <tr>
+                  <td class="text-muted">Container Runtime</td>
+                  <td>Docker</td>
+                </tr>
+                <tr>
+                  <td class="text-muted">Platform</td>
+                  <td>Raspberry Pi (MPU)</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+</div>
+
+<!-- Add Node Modal -->
+<div class="modal fade" id="addNodeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-diagram-3 me-2"></i>Add Federation Node</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Node ID</label>
+          <input type="text" class="form-control" id="new-node-id" placeholder="e.g. node-2" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Hostname</label>
+          <input type="text" class="form-control" id="new-node-hostname" placeholder="e.g. neighbor" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">IP Address</label>
+          <input type="text" class="form-control" id="new-node-ip" placeholder="e.g. 192.168.1.2" />
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Port</label>
+          <input type="number" class="form-control" id="new-node-port" value="5000" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="addNode()">
+          <i class="bi bi-plus-lg me-1"></i>Add Node
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

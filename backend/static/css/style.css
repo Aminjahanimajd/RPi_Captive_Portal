@@ -1,0 +1,107 @@
+/* ── Global ─────────────────────────────────────────────────────────────── */
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background-color: #f0f4f8;
+}
+
+code {
+  font-size: 0.85em;
+  color: #5b47fb;
+  background: #eef1ff;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* ── Captive Portal ──────────────────────────────────────────────────────── */
+
+.portal-bg {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  min-height: 100vh;
+}
+
+.portal-card {
+  width: 100%;
+  max-width: 440px;
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.portal-header {
+  background: linear-gradient(135deg, #0f3460, #e94560);
+  border-bottom: none;
+}
+
+.portal-icon {
+  width: 64px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.btn-portal {
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.nav-pills .nav-link.active {
+  background-color: #0f3460;
+}
+
+/* ── Dashboard ───────────────────────────────────────────────────────────── */
+
+.text-white-75 {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.w-40 {
+  width: 40%;
+}
+
+/* ── Admin Panel ─────────────────────────────────────────────────────────── */
+
+.nav-tabs .nav-link {
+  color: #495057;
+  border-radius: 0;
+}
+
+.nav-tabs .nav-link.active {
+  color: #0f3460;
+  font-weight: 600;
+  border-bottom-color: #fff;
+}
+
+.table > :not(caption) > * > * {
+  vertical-align: middle;
+}
+
+/* ── Flash messages ──────────────────────────────────────────────────────── */
+
+.flash-container {
+  max-width: 480px;
+}
+
+/* ── Utilities ───────────────────────────────────────────────────────────── */
+
+.card {
+  border-radius: 12px;
+}
+
+.card-header {
+  border-bottom: 1px solid #e9ecef;
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.badge {
+  font-size: 0.75em;
+  font-weight: 500;
+  padding: 0.35em 0.65em;
+}

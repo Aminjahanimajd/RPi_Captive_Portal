@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}WiFi Captive Portal — Connect{% endblock %}
+
+{% block content %}
+<div class="portal-bg d-flex align-items-center justify-content-center min-vh-100">
+  <div class="card portal-card shadow-lg">
+
+    <!-- Header -->
+    <div class="card-header portal-header text-center py-4">
+      <div class="portal-icon mb-2">
+        <i class="bi bi-wifi fs-1 text-white"></i>
+      </div>
+      <h3 class="text-white mb-0 fw-bold">WiFi Captive Portal</h3>
+      <p class="text-white-50 small mb-0">Raspberry Pi IoT Gateway</p>
+    </div>
+
+    <!-- Tabs -->
+    <div class="card-body p-4">
+      <ul class="nav nav-pills nav-fill mb-4" id="authTabs">
+        <li class="nav-item">
+          <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#loginTab">
+            <i class="bi bi-box-arrow-in-right me-1"></i>Login
+          </button>
+        </li>
+        <li class="nav-item">
+          <button class="nav-link" data-bs-toggle="pill" data-bs-target="#registerTab">
+            <i class="bi bi-person-plus me-1"></i>Register
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- Login Form -->
+        <div class="tab-pane fade show active" id="loginTab">
+          <form method="POST" action="{{ url_for('login') }}" novalidate>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="login-username">
+                <i class="bi bi-person me-1"></i>Username
+              </label>
+              <input type="text" class="form-control" id="login-username" name="username"
+                     placeholder="Enter your username" required autocomplete="username" />
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-semibold" for="login-password">
+                <i class="bi bi-lock me-1"></i>Password
+              </label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="login-password" name="password"
+                       placeholder="Enter your password" required autocomplete="current-password" />
+                <button class="btn btn-outline-secondary toggle-pwd" type="button" data-target="login-password">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 btn-portal">
+              <i class="bi bi-box-arrow-in-right me-2"></i>Connect to Network
+            </button>
+          </form>
+        </div>
+
+        <!-- Register Form -->
+        <div class="tab-pane fade" id="registerTab">
+          <form method="POST" action="{{ url_for('register') }}" novalidate id="registerForm">
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="reg-username">
+                <i class="bi bi-person me-1"></i>Username
+              </label>
+              <input type="text" class="form-control" id="reg-username" name="username"
+                     placeholder="Choose a username" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="reg-email">
+                <i class="bi bi-envelope me-1"></i>Email <span class="text-muted fw-normal">(optional)</span>
+              </label>
+              <input type="email" class="form-control" id="reg-email" name="email"
+                     placeholder="your@email.com" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="reg-password">
+                <i class="bi bi-lock me-1"></i>Password
+              </label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="reg-password" name="password"
+                       placeholder="At least 6 characters" required autocomplete="new-password" />
+                <button class="btn btn-outline-secondary toggle-pwd" type="button" data-target="reg-password">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-semibold" for="reg-confirm">
+                <i class="bi bi-lock-fill me-1"></i>Confirm Password
+              </label>
+              <input type="password" class="form-control" id="reg-confirm"
+                     placeholder="Repeat password" required autocomplete="new-password" />
+              <div class="invalid-feedback">Passwords do not match.</div>
+            </div>
+            <button type="submit" class="btn btn-success w-100 btn-portal">
+              <i class="bi bi-person-check me-2"></i>Create Account &amp; Connect
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer info -->
+    <div class="card-footer text-center py-3 bg-light">
+      <small class="text-muted">
+        <i class="bi bi-shield-lock me-1"></i>
+        Secured by Federated Filesystem Encryption &nbsp;·&nbsp; Node: <code>{{ request.host }}</code>
+      </small>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

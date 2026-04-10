@@ -1,0 +1,76 @@
+version: '3.8'
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WiFi Captive Portal — Docker Compose
+#
+# Two services demonstrate the federated key-shard architecture:
+#   portal   — primary node (acts as captive portal gateway)
+#   neighbor — secondary node (holds one key shard for portal's filesystem)
+#
+# Both nodes exchange shards on boot so each can reconstruct the master key
+# and mount its secure filesystem partition.
+#
+# On a real Raspberry Pi deployment you would:
+#   1. Run `docker compose up -d` on each Pi.
+#   2. Set NEIGHBOR_NODES to the IP:port of the other Pi nodes.
+#   3. Configure hostapd + iptables via scripts/setup_hotspot.sh
+#      so all captive-portal traffic is redirected to port 5000.
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  portal:
+    build: ./backend
+    container_name: captive_portal
+    ports:
+      - "5000:5000"
+    volumes:
+      - portal_data:/data
+    environment:
+      - NODE_ID=node-1
+      - NODE_HOST=portal
+      - NEIGHBOR_NODES=neighbor:5000
+      - SECRET_KEY=CHANGE_THIS_TO_A_RANDOM_SECRET_IN_PRODUCTION
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
+      - FLASK_ENV=development
+    restart: unless-stopped
+    networks:
+      - captive_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  neighbor:
+    build: ./backend
+    container_name: neighbor_node
+    ports:
+      - "5001:5000"
+    volumes:
+      - neighbor_data:/data
+    environment:
+      - NODE_ID=node-2
+      - NODE_HOST=neighbor
+      - NEIGHBOR_NODES=portal:5000
+      - SECRET_KEY=CHANGE_THIS_TO_A_RANDOM_SECRET_IN_PRODUCTION
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin123
+      - FLASK_ENV=development
+    restart: unless-stopped
+    networks:
+      - captive_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  portal_data:
+  neighbor_data:
+
+networks:
+  captive_net:
+    driver: bridge
