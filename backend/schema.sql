@@ -31,9 +31,27 @@ CREATE TABLE IF NOT EXISTS federation_nodes (
     ip_address    TEXT     NOT NULL,
     port          INTEGER  NOT NULL DEFAULT 5000,
     public_key    TEXT,
+    shared_secret TEXT,
     is_trusted    INTEGER  NOT NULL DEFAULT 0,
     last_seen     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS federation_nonce_log (
+    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
+    node_id       TEXT     NOT NULL,
+    nonce         TEXT     NOT NULL,
+    seen_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(node_id, nonce)
+);
+
+CREATE TABLE IF NOT EXISTS federation_trust_audit (
+    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
+    endpoint      TEXT     NOT NULL,
+    node_id       TEXT     NOT NULL,
+    decision      TEXT     NOT NULL,              -- 'accepted' | 'rejected'
+    reason        TEXT,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS key_shards (
