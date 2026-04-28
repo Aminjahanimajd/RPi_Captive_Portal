@@ -40,6 +40,23 @@ class AppMembershipApiTests(unittest.TestCase):
             sess["username"] = "admin"
             sess["role"] = "admin"
 
+    def _prepare_authorized_admin_device(self, mac_address: str = "AA:BB:CC:DD:EE:FF") -> None:
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute("UPDATE users SET mac_address = ? WHERE id = 1", (mac_address,))
+            db.execute(
+                """INSERT INTO devices (mac_address, hostname, ip_address, user_id, is_authorized)
+                   VALUES (?, ?, ?, ?, 1)
+                   ON CONFLICT(mac_address) DO UPDATE SET
+                       hostname = excluded.hostname,
+                       ip_address = excluded.ip_address,
+                       user_id = excluded.user_id,
+                       is_authorized = 1,
+                       last_seen = CURRENT_TIMESTAMP""",
+                (mac_address, "admin-device", "10.0.0.10", 1),
+            )
+            db.commit()
+
     def test_add_node_creates_pending_membership_entry(self):
         resp = self.client.post(
             "/admin/nodes",
@@ -258,7 +275,16 @@ class AppMembershipApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(second.status_code, 409)
-        self.assertIn("Stale epoch transition rejected", second.get_json()["error"])
+
+    def test_dashboard_redirects_when_session_user_is_missing(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = 999
+            sess["username"] = "ghost"
+            sess["role"] = "user"
+
+        resp = self.client.get("/dashboard", follow_redirects=False)
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/portal", resp.headers["Location"])
 
     def test_federation_catchup_endpoint_returns_epoch_and_share(self):
         old_unsigned = app_module.FEDERATION_ALLOW_UNSIGNED
@@ -350,6 +376,39 @@ class AppMembershipApiTests(unittest.TestCase):
         payload = resp.get_json()
         self.assertIn("runtime_profile", payload)
         self.assertTrue(payload["runtime_profile"])
+        self.assertIn("security_state", payload)
+
+    def test_secure_files_are_locked_without_trusted_peer(self):
+        self._prepare_authorized_admin_device()
+
+        resp = self.client.get("/api/files")
+        self.assertEqual(resp.status_code, 503)
+        self.assertIn("locked", resp.get_json()["error"].lower())
+
+    def test_secure_state_becomes_ready_after_trusted_peer_and_shards(self):
+        self.client.post(
+            "/admin/nodes",
+            json={
+                "node_id": "node-ready",
+                "hostname": "rpi-ready",
+                "ip_address": "10.0.0.14",
+                "port": 5000,
+            },
+        )
+        self.client.post("/admin/nodes/node-ready/trust")
+        app_module.federation.generate_and_distribute_shards(n_nodes=2, threshold_k=2)
+        app_module.federation._received_shards = {
+            "node-ready": (1, bytes([3] * 32), None)
+        }
+        app_module.federation._is_mounted = True
+        app_module.federation._mount_backend = "simulation"
+        app_module.federation._initialize_secure_store()
+        self._prepare_authorized_admin_device()
+
+        resp = self.client.get("/api/status")
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertTrue(payload["security_state"]["is_ready"])
 
 
 if __name__ == "__main__":

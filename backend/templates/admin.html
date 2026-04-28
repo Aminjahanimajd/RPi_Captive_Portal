@@ -424,6 +424,11 @@
           <label class="form-label fw-semibold">Port</label>
           <input type="number" class="form-control" id="new-node-port" value="5000" />
         </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Shared Secret</label>
+          <input type="text" class="form-control" id="new-node-secret" placeholder="e.g. CHANGE_THIS_CLUSTER_FEDERATION_SECRET" />
+          <small class="text-muted">Must match the FEDERATION_SHARED_SECRET from docker-compose.yml or .env</small>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

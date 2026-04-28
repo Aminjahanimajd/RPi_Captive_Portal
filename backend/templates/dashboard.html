@@ -7,9 +7,9 @@
   <div class="container">
     <span class="navbar-brand fw-bold"><i class="bi bi-wifi me-2"></i>WiFi Portal</span>
     <div class="d-flex align-items-center gap-3">
-      <span class="text-white-50 small">
+      <a href="{{ url_for('personal_profile') }}" class="text-white-50 text-decoration-none" style="cursor: pointer;">
         <i class="bi bi-person-circle me-1"></i>{{ session['username'] }}
-      </span>
+      </a>
       <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">
         <i class="bi bi-box-arrow-right me-1"></i>Logout
       </a>
@@ -139,47 +139,40 @@
         </div>
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-sm-4">
-              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
-                {% if fed_status['is_mounted'] %}
-                <i class="bi bi-unlock-fill fs-2 text-success"></i>
+            <div class="col-sm-6 col-xl-3">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light h-100">
+                <i id="secure-partition-icon" class="bi {% if security_state['is_ready'] %}bi-unlock-fill text-success{% else %}bi-lock-fill text-warning{% endif %} fs-2"></i>
                 <div>
-                  <div class="fw-semibold text-success">Partition Mounted</div>
-                  <small class="text-muted">Secure storage is active</small>
+                  <div id="secure-partition-title" class="fw-semibold {% if security_state['is_ready'] %}text-success{% else %}text-warning{% endif %}">{{ security_state['status_label'] }}</div>
+                  <small id="secure-partition-message" class="text-muted">{{ security_state['status_message'] }}</small>
                 </div>
-                {% else %}
-                <i class="bi bi-lock-fill fs-2 text-warning"></i>
-                <div>
-                  <div class="fw-semibold text-warning">Partition Locked</div>
-                  <small class="text-muted">Waiting for key reconstruction</small>
-                </div>
-                {% endif %}
               </div>
             </div>
-            <div class="col-sm-4">
-              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
+            <div class="col-sm-6 col-xl-3">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light h-100">
                 <i class="bi bi-puzzle-fill fs-2 text-primary"></i>
                 <div>
                   <div class="fw-semibold">Key Shards Collected</div>
-                  <small class="text-muted">{{ fed_status['shards_collected'] }} from neighbours</small>
+                  <small class="text-muted"><span id="peer-shards-collected">{{ security_state['peer_shards_collected'] }}</span> / <span id="peer-shards-required">{{ security_state['required_peer_shards'] }}</span> from trusted neighbours</small>
                 </div>
               </div>
             </div>
-            <div class="col-sm-4">
-              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light">
-                {% if fed_status['has_master_key'] %}
-                <i class="bi bi-key-fill fs-2 text-success"></i>
+            <div class="col-sm-6 col-xl-3">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light h-100">
+                <i id="master-key-icon" class="bi {% if security_state['is_ready'] %}bi-key-fill text-success{% else %}bi-key text-secondary{% endif %} fs-2"></i>
                 <div>
-                  <div class="fw-semibold text-success">Master Key Ready</div>
-                  <small class="text-muted">Filesystem encryption active</small>
+                  <div id="master-key-title" class="fw-semibold {% if security_state['is_ready'] %}text-success{% else %}text-secondary{% endif %}">{% if security_state['is_ready'] %}Master Key Ready{% else %}No Master Key{% endif %}</div>
+                  <small id="master-key-message" class="text-muted">{% if security_state['is_ready'] %}Filesystem encryption active{% else %}Federation bootstrap pending{% endif %}</small>
                 </div>
-                {% else %}
-                <i class="bi bi-key fs-2 text-secondary"></i>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="d-flex align-items-center gap-3 p-3 rounded-3 bg-light h-100">
+                <i class="bi bi-diagram-3-fill fs-2 text-info"></i>
                 <div>
-                  <div class="fw-semibold text-secondary">No Master Key</div>
-                  <small class="text-muted">Federation bootstrap pending</small>
+                  <div class="fw-semibold">Trusted Peers</div>
+                  <small class="text-muted"><span id="trusted-peers-count">{{ security_state['trusted_peers'] }}</span> trusted neighbour(s)</small>
                 </div>
-                {% endif %}
               </div>
             </div>
           </div>
@@ -187,28 +180,57 @@
       </div>
     </div>
 
-    <!-- Secure Files -->
-    {% if fed_status['is_mounted'] %}
+
+
+      <!-- Secure Files -->
     <div class="col-12">
       <div class="card shadow-sm">
         <div class="card-header bg-white fw-semibold d-flex align-items-center justify-content-between">
           <span><i class="bi bi-folder-lock me-2 text-success"></i>Secure Partition — Files</span>
-          <button class="btn btn-sm btn-outline-secondary" onclick="loadSecureFiles()" id="btn-refresh-files">
+          <button class="btn btn-sm btn-outline-secondary" onclick="loadSecureFiles()" id="btn-refresh-files" {% if not security_state['is_ready'] %}disabled{% endif %}>
             <i class="bi bi-arrow-clockwise me-1"></i>Refresh
           </button>
         </div>
         <div class="card-body" id="secure-files-panel">
+          {% if security_state['is_ready'] %}
           <p class="text-muted mb-0"><i class="bi bi-hourglass-split me-1"></i>Loading file list…</p>
+          {% else %}
+          <div class="alert alert-warning mb-0">
+            <div class="fw-semibold mb-1"><i class="bi bi-lock-fill me-1"></i>Locked until federation is ready</div>
+            <div id="secure-files-lock-reason">{{ security_state['status_message'] }}</div>
+            {% if security_state['reasons'] %}
+            <ul class="mb-0 mt-2">
+              {% for reason in security_state['reasons'] %}
+              <li>{{ reason }}</li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
-    {% endif %}
+
+    <!-- Security Architecture Diagram -->
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-shield-lock me-2 text-danger"></i>Multi-Layer Security Design
+        </div>
+        <div class="card-body text-center p-4">
+          <img src="{{ url_for('static', filename='images/security-layers.svg') }}" alt="Security Layers Diagram" class="img-fluid" style="max-width: 100%; max-height: 300px;">
+          <p class="text-muted mt-3 mb-0"><small>This project demonstrates web programming and security principles through federated filesystem access control.</small></p>
+        </div>
+      </div>
+    </div>
 
   </div>
 </div>
 
-{% if fed_status['is_mounted'] %}
 <script>
+const initialSecurityState = {{ security_state | tojson }};
+let secureFilesLoaded = false;
+
 function renderTree(items, indent) {
   if (!items || items.length === 0) return '<span class="text-muted small">Empty</span>';
   let html = '<ul class="list-unstyled mb-0' + (indent ? ' ms-3' : '') + '">';
@@ -235,6 +257,7 @@ function renderTree(items, indent) {
 
 function loadSecureFiles() {
   const panel = document.getElementById('secure-files-panel');
+  if (!panel) return;
   panel.innerHTML = '<p class="text-muted mb-0"><i class="bi bi-hourglass-split me-1"></i>Loading…</p>';
   fetch('/api/files')
     .then(function(r) { return r.json(); })
@@ -252,7 +275,90 @@ function loadSecureFiles() {
     });
 }
 
-loadSecureFiles();
+function renderLockedNotice(state) {
+  const reasons = Array.isArray(state.reasons) ? state.reasons : [];
+  const items = reasons.map(function(reason) {
+    return '<li>' + reason + '</li>';
+  }).join('');
+  return '<div class="alert alert-warning mb-0">'
+    + '<div class="fw-semibold mb-1"><i class="bi bi-lock-fill me-1"></i>Locked until federation is ready</div>'
+    + '<div id="secure-files-lock-reason">' + (state.status_message || 'Waiting for secure federation state') + '</div>'
+    + (items ? '<ul class="mb-0 mt-2">' + items + '</ul>' : '')
+    + '</div>';
+}
+
+function applySecurityState(state) {
+  const secure = state && state.security_state ? state.security_state : state;
+  if (!secure) return;
+
+  const ready = !!secure.is_ready;
+  const partitionIcon = document.getElementById('secure-partition-icon');
+  const partitionTitle = document.getElementById('secure-partition-title');
+  const partitionMessage = document.getElementById('secure-partition-message');
+  const masterIcon = document.getElementById('master-key-icon');
+  const masterTitle = document.getElementById('master-key-title');
+  const masterMessage = document.getElementById('master-key-message');
+  const collected = document.getElementById('peer-shards-collected');
+  const required = document.getElementById('peer-shards-required');
+  const trustedPeers = document.getElementById('trusted-peers-count');
+  const refreshButton = document.getElementById('btn-refresh-files');
+  const panel = document.getElementById('secure-files-panel');
+
+  if (partitionIcon) {
+    partitionIcon.className = 'bi ' + (ready ? 'bi-unlock-fill text-success' : 'bi-lock-fill text-warning') + ' fs-2';
+  }
+  if (partitionTitle) {
+    partitionTitle.textContent = ready ? 'Ready' : 'Locked';
+    partitionTitle.className = 'fw-semibold ' + (ready ? 'text-success' : 'text-warning');
+  }
+  if (partitionMessage) {
+    partitionMessage.textContent = secure.status_message || (ready ? 'Secure files are available' : 'Waiting for federation readiness');
+  }
+  if (collected) collected.textContent = secure.peer_shards_collected ?? 0;
+  if (required) required.textContent = secure.required_peer_shards ?? 1;
+  if (trustedPeers) trustedPeers.textContent = secure.trusted_peers ?? 0;
+
+  if (masterIcon) {
+    masterIcon.className = 'bi ' + (ready ? 'bi-key-fill text-success' : 'bi-key text-secondary') + ' fs-2';
+  }
+  if (masterTitle) {
+    masterTitle.textContent = ready ? 'Master Key Ready' : 'No Master Key';
+    masterTitle.className = 'fw-semibold ' + (ready ? 'text-success' : 'text-secondary');
+  }
+  if (masterMessage) {
+    masterMessage.textContent = ready ? 'Filesystem encryption active' : 'Federation bootstrap pending';
+  }
+
+  if (refreshButton) {
+    refreshButton.disabled = !ready;
+  }
+
+  if (!panel) return;
+  if (!ready) {
+    secureFilesLoaded = false;
+    panel.innerHTML = renderLockedNotice(secure);
+    return;
+  }
+
+  if (!secureFilesLoaded) {
+    secureFilesLoaded = true;
+    loadSecureFiles();
+  }
+}
+
+async function refreshDashboardState() {
+  try {
+    const resp = await fetch('/api/status');
+    const data = await resp.json();
+    if (!resp.ok) return;
+    applySecurityState(data);
+  } catch (_err) {
+    // Keep the last known state if the network blips.
+  }
+}
+
+applySecurityState(initialSecurityState);
+refreshDashboardState();
+setInterval(refreshDashboardState, 5000);
 </script>
-{% endif %}
 {% endblock %}

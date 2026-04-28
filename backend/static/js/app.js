@@ -117,6 +117,7 @@ async function addNode() {
   const hostname = document.getElementById('new-node-hostname').value.trim();
   const ip       = document.getElementById('new-node-ip').value.trim();
   const port     = parseInt(document.getElementById('new-node-port').value, 10) || 5000;
+  const secret   = document.getElementById('new-node-secret').value.trim();
 
   if (!nodeId || !hostname || !ip) {
     alert('Node ID, hostname, and IP address are required.');
@@ -124,7 +125,7 @@ async function addNode() {
   }
 
   const data = await adminPost('/admin/nodes', {
-    node_id: nodeId, hostname, ip_address: ip, port,
+    node_id: nodeId, hostname, ip_address: ip, port, shared_secret: secret,
   });
   if (data) {
     bootstrap.Modal.getInstance(document.getElementById('addNodeModal')).hide();

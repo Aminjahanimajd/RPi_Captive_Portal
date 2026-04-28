@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS users (
     role          TEXT     NOT NULL DEFAULT 'user',   -- 'admin' | 'user'
     mac_address   TEXT,
     is_active     INTEGER  NOT NULL DEFAULT 1,
+    first_name    TEXT,
+    last_name     TEXT,
+    avatar_url    TEXT,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

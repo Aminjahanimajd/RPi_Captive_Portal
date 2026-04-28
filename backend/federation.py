@@ -421,7 +421,7 @@ class FederationAgent:
             bundle = {
                 "scheme": "legacy-xor-migrated",
                 "node_id": self.node_id,
-                "epoch_id": secrets.token_hex(8),
+                "epoch_id": self._calculate_deterministic_epoch_id(),
                 "threshold_k": total_n,
                 "total_shares_n": total_n,
                 "shares": shares,
@@ -435,15 +435,54 @@ class FederationAgent:
         self._total_shares_n = int(payload.get("total_shares_n", 0)) or None
         return payload
 
+    def _calculate_deterministic_epoch_id(self, trusted_node_ids: list[str] | None = None) -> str:
+        """
+        Calculate a deterministic epoch ID based on sorted NODE_IDs only.
+        
+        This ensures all nodes in the cluster compute the SAME epoch_id,
+        regardless of their configured neighbor addresses or runtime environment.
+        
+        The epoch is based on:
+        1. This node's NODE_ID (from NODE_ID env var)
+        2. All other node IDs that are trusted in the database (if provided)
+        
+        If no trusted nodes are provided yet (first bootstrap), we use just this node's ID,
+        which will be overwritten once nodes exchange shards and both nodes sync via 
+        the provided trusted_node_ids from the database.
+        
+        Args:
+            trusted_node_ids: List of node IDs that are trusted in DB (e.g., ["node-1", "node-2"])
+        
+        Returns:
+            Hex string: first 16 chars of SHA256 hash of sorted node IDs
+        """
+        # Collect all known node IDs: self + any trusted peers from DB
+        all_node_ids = [self.node_id]
+        if trusted_node_ids:
+            all_node_ids.extend(trusted_node_ids)
+        
+        # Sort for determinism: both nodes will produce same list regardless of discovery order
+        all_node_ids = sorted(set(all_node_ids))
+        
+        node_list_str = "|".join(all_node_ids)
+        epoch_hash = hashlib.sha256(node_list_str.encode("utf-8")).hexdigest()
+        return epoch_hash[:16]  # Use first 16 chars (8 bytes when hex-encoded)
+
     def generate_and_distribute_shards(
         self,
         n_nodes: int | None = None,
         threshold_k: int | None = None,
+        trusted_node_ids: list[str] | None = None,
     ) -> dict:
         """
         Split the master key into Shamir k-of-n shares and persist them.
 
         Returns the persisted shard bundle payload.
+        
+        Args:
+            n_nodes: Number of shares (N in k-of-n). Defaults to len(neighbors) + 1.
+            threshold_k: Threshold (K in k-of-n). Defaults to computed value.
+            trusted_node_ids: List of trusted node IDs for deterministic epoch calculation.
         """
         if not self._master_key:
             self._load_or_generate_master_key()
@@ -463,7 +502,7 @@ class FederationAgent:
         bundle = {
             "scheme": "shamir-k-of-n",
             "node_id": self.node_id,
-            "epoch_id": secrets.token_hex(8),
+            "epoch_id": self._calculate_deterministic_epoch_id(trusted_node_ids),
             "threshold_k": threshold_k,
             "total_shares_n": total_n,
             "shares": {
@@ -479,10 +518,11 @@ class FederationAgent:
         self._total_shares_n = total_n
 
         logger.info(
-            "Generated Shamir shares for node %s (k=%d, n=%d)",
+            "Generated Shamir shares for node %s (k=%d, n=%d, epoch=%s)",
             self.node_id,
             threshold_k,
             total_n,
+            self._share_epoch_id,
         )
         return bundle
 
@@ -871,20 +911,31 @@ class FederationAgent:
 
     # ── Bootstrap ────────────────────────────────────────────────────────────
 
-    def bootstrap(self) -> None:
+    def bootstrap(self, trusted_node_ids: list[str] | None = None) -> None:
         """
         Boot-time federation join sequence.
 
-        1. Wait briefly for neighbour containers to become ready.
-        2. For each known neighbour, POST our own shard and receive theirs.
-        3. Attempt key reconstruction once shards are collected.
-        4. Fall back to single-node (local key) mode if no neighbours reply.
+        1. Generate master key and calculate deterministic epoch based on trusted peers.
+        2. Wait briefly for neighbour containers to become ready.
+        3. For each known neighbour, POST our own shard and receive theirs.
+        4. Attempt key reconstruction once shards are collected.
+        5. Fall back to single-node (local key) mode if no neighbours reply.
+        
+        Args:
+            trusted_node_ids: List of trusted node IDs from database (for deterministic epoch).
+                             If provided, used to calculate the epoch so all peers compute the same value.
         """
         logger.info("Federation bootstrap starting for node %s", self.node_id)
 
+        # Generate master key with deterministic epoch if trusted nodes are known
+        self._load_or_generate_master_key()
+        if trusted_node_ids:
+            self.generate_and_distribute_shards(trusted_node_ids=trusted_node_ids)
+            epoch = self._share_epoch_id
+            logger.info("Generated shards with deterministic epoch: %s", epoch)
+
         if not self.neighbor_addresses:
             logger.info("No neighbours configured — single-node mode")
-            self._load_or_generate_master_key()
             self._mount_secure_partition()
             return
 
@@ -913,7 +964,6 @@ class FederationAgent:
 
         if not self._is_mounted:
             logger.warning("Bootstrap incomplete — falling back to local key")
-            self._load_or_generate_master_key()
             self._mount_secure_partition()
 
     def _exchange_shard_with(self, neighbour_url: str) -> None:

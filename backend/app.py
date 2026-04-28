@@ -21,6 +21,7 @@ Routes
 
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import sqlite3
@@ -264,7 +265,6 @@ def _build_logical_graph(db: sqlite3.Connection) -> dict:
                 "is_local": node_id == NODE_ID,
             }
         )
-
     for node_id, member in member_by_id.items():
         if node_id == NODE_ID:
             continue
@@ -333,6 +333,44 @@ def _build_logical_graph(db: sqlite3.Connection) -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
+
+def _build_secure_access_state() -> dict:
+    """Summarize whether secure files should be visible and accessible."""
+    federation_state = federation.get_status()
+    membership_state = membership.summary()
+
+    trusted_members = int(membership_state["members"].get("trusted", 0))
+    trusted_peer_count = max(trusted_members - 1, 0)
+    threshold_k = int(federation_state.get("threshold_k", 0))
+    peer_shards_collected = int(federation_state.get("shards_collected", 0))
+    required_peer_shards = max(threshold_k - 1, 1)
+
+    reasons = []
+    if trusted_peer_count < 1:
+        reasons.append("Add and trust at least one neighbour node")
+    if peer_shards_collected < required_peer_shards:
+        reasons.append(
+            f"Collect at least {required_peer_shards} shard(s) from trusted neighbours"
+        )
+    if not federation_state.get("is_mounted"):
+        reasons.append("Secure partition is not mounted yet")
+    if not federation_state.get("has_master_key"):
+        reasons.append("Master key has not been reconstructed yet")
+
+    is_ready = not reasons
+    return {
+        "is_ready": is_ready,
+        "status_label": "Ready" if is_ready else "Locked",
+        "status_message": "Secure files are available" if is_ready else reasons[0],
+        "reasons": reasons,
+        "trusted_members": trusted_members,
+        "trusted_peers": trusted_peer_count,
+        "peer_shards_collected": peer_shards_collected,
+        "required_peer_shards": required_peer_shards,
+        "federation": federation_state,
+        "membership": membership_state,
+    }
+
 # ── Database helpers ───────────────────────────────────────────────────────
 
 
@@ -393,6 +431,13 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if "user_id" not in session or session.get("role") != "admin":
+            flash("Administrator access required.", "error")
+            return redirect(url_for("portal"))
+
+        db = get_db()
+        user = db.execute("SELECT id, is_active, role FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+        if not user or not user["is_active"] or user["role"] != "admin":
+            session.clear()
             flash("Administrator access required.", "error")
             return redirect(url_for("portal"))
         return f(*args, **kwargs)
@@ -484,6 +529,12 @@ def logout():
 def dashboard():
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    if not user or not user["is_active"]:
+        session.clear()
+        flash("Your account is no longer available. Please log in again.", "warning")
+        return redirect(url_for("portal"))
+
+    security_state = _build_secure_access_state()
     device = None
     if user["mac_address"]:
         device = db.execute(
@@ -494,8 +545,90 @@ def dashboard():
         user=user,
         device=device,
         node_id=NODE_ID,
-        fed_status=federation.get_status(),
+        fed_status=security_state["federation"],
+        security_state=security_state,
     )
+
+
+# ── Personal Profile Panel ─────────────────────────────────────────────────
+
+
+@app.route("/personal-profile")
+@login_required
+def personal_profile():
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    if not user or not user["is_active"]:
+        session.clear()
+        flash("Your account is no longer available. Please log in again.", "warning")
+        return redirect(url_for("portal"))
+
+    device = None
+    if user["mac_address"]:
+        device = db.execute(
+            "SELECT * FROM devices WHERE mac_address = ?", (user["mac_address"],)
+        ).fetchone()
+    return render_template(
+        "personal_profile.html",
+        user=user,
+        device=device,
+    )
+
+
+@app.route("/user/profile", methods=["PATCH"])
+@login_required
+def update_user_profile():
+    """Update user profile information (first name, last name, email, avatar)."""
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    if not user or not user["is_active"]:
+        session.clear()
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        data = request.get_json() or {}
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        email = data.get("email")
+        avatar_url = data.get("avatar_url")
+
+        db.execute(
+            """UPDATE users 
+               SET first_name = ?, last_name = ?, email = ?, avatar_url = ? 
+               WHERE id = ?""",
+            (first_name, last_name, email, avatar_url, session["user_id"]),
+        )
+        db.commit()
+        return jsonify({"message": "Profile updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/user/request-trust-validation", methods=["POST"])
+@login_required
+def request_trust_validation():
+    """User requests trust validation from administrators."""
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+    if not user or not user["is_active"]:
+        session.clear()
+        return jsonify({"error": "User not found"}), 404
+
+    try:
+        # Log the request (could be extended to create a pending request table)
+        device_mac = user["mac_address"] or "unknown"
+        app.logger.info(f"User {user['username']} (MAC: {device_mac}) requested trust validation.")
+
+        # Optional: Create an admin notification (simplified here)
+        db.execute(
+            """INSERT INTO access_log (device_mac, action, ip_address)
+               VALUES (?, ?, ?)""",
+            (device_mac, "trust_request", request.remote_addr),
+        )
+        db.commit()
+        return jsonify({"message": "Your request has been submitted to administrators. They will review your identity and device."}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ── Admin Panel ────────────────────────────────────────────────────────────
@@ -1039,6 +1172,7 @@ def federation_mount_status():
 
 @app.route("/api/status")
 def api_status():
+    security_state = _build_secure_access_state()
     return jsonify(
         {
             "node_id": NODE_ID,
@@ -1046,6 +1180,7 @@ def api_status():
             "runtime_profile": ACTIVE_RUNTIME_PROFILE,
             "federation": federation.get_status(),
             "membership": membership.summary(),
+            "security_state": security_state,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )
@@ -1075,8 +1210,9 @@ def _validate_secure_file_access() -> tuple[sqlite3.Row | None, sqlite3.Row | No
     if not user["is_active"]:
         return None, None, ({"error": "User account is inactive"}, 403)
 
-    if not federation.get_status()["is_mounted"]:
-        return None, None, ({"error": "Secure partition is not mounted"}, 503)
+    security_state = _build_secure_access_state()
+    if not security_state["is_ready"]:
+        return None, None, ({"error": f"Secure partition is locked: {security_state['status_message']}"}, 503)
 
     mac = user["mac_address"] or _get_client_mac(request)
     if not mac:
@@ -1230,11 +1366,43 @@ def _log_access(db, identifier: str, action: str, ip: str) -> None:
     )
 
 
+def _bootstrap_federation_with_db_trust() -> None:
+    """
+    Bootstrap federation with trusted node IDs from database.
+    
+    Queries the database for nodes marked as trusted, then passes their
+    node IDs to the federation bootstrap so all nodes compute the same
+    deterministic epoch ID, enabling successful shard exchange.
+    """
+    time.sleep(2)  # Wait for DB to initialize
+    try:
+        with app.app_context():
+            db = get_db()
+            # Get all trusted node IDs from federation_nodes table
+            trusted_rows = db.execute(
+                "SELECT node_id FROM federation_nodes WHERE is_trusted = 1"
+            ).fetchall()
+            trusted_node_ids = [row["node_id"] for row in trusted_rows]
+            
+            if trusted_node_ids:
+                app.logger.info(
+                    "Bootstrap federation with trusted nodes: %s",
+                    trusted_node_ids,
+                )
+                # Pass trusted node IDs so federation computes same epoch as all peers
+                federation.bootstrap(trusted_node_ids=trusted_node_ids)
+            else:
+                app.logger.info("No trusted nodes in database yet, using default bootstrap")
+                federation.bootstrap()
+    except Exception as exc:
+        app.logger.error("Federation bootstrap failed: %s", exc)
+
+
 # ── Entry Point ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     init_db()
-    threading.Thread(target=federation.bootstrap, daemon=True).start()
+    threading.Thread(target=_bootstrap_federation_with_db_trust, daemon=True).start()
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
     app.run(host="0.0.0.0", port=port, debug=debug)
