@@ -3,17 +3,23 @@
 -- Integrated project: Web Programming + System Security (Federated Filesystem)
 
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    username      TEXT     NOT NULL UNIQUE,
-    password_hash TEXT     NOT NULL,
-    email         TEXT,
-    role          TEXT     NOT NULL DEFAULT 'user',   -- 'admin' | 'user'
-    mac_address   TEXT,
-    is_active     INTEGER  NOT NULL DEFAULT 1,
-    first_name    TEXT,
-    last_name     TEXT,
-    avatar_url    TEXT,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id              INTEGER  PRIMARY KEY AUTOINCREMENT,
+    username        TEXT     NOT NULL UNIQUE,
+    password_hash   TEXT     NOT NULL,
+    email           TEXT,
+    role            TEXT     NOT NULL DEFAULT 'user',   -- 'admin' | 'user'
+    mac_address     TEXT,
+    is_active       INTEGER  NOT NULL DEFAULT 1,
+    first_name      TEXT,
+    last_name       TEXT,
+    avatar_url      TEXT,
+    profile_picture TEXT,                               -- filename of uploaded profile picture
+    phone_number    TEXT,
+    country         TEXT,
+    gender          TEXT,                               -- 'male' | 'female' | 'other' | null
+    birth_date      TEXT,                               -- YYYY-MM-DD format
+    birth_place     TEXT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS devices (

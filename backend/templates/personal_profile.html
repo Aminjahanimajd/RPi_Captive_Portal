@@ -53,6 +53,33 @@
         </div>
         <div class="card-body">
           <form id="profile-form">
+            <!-- Profile Picture Upload -->
+            <div class="mb-4 pb-3 border-bottom">
+              <label class="form-label fw-semibold">Profile Picture</label>
+              <div class="d-flex align-items-center gap-3">
+                <div id="profile-picture-container" class="text-center">
+                  {% if user['profile_picture'] %}
+                  <img id="current-picture" src="{{ url_for('static', filename='uploads/' + user['profile_picture']) }}" alt="Profile" class="rounded-circle" style="width: 100px; height: 100px; object-fit: cover;">
+                  {% else %}
+                  <div id="current-picture" class="rounded-circle d-flex align-items-center justify-content-center bg-light" style="width: 100px; height: 100px;">
+                    <i class="bi bi-person-circle text-secondary" style="font-size: 2rem;"></i>
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                  <input type="file" class="form-control" id="picture-upload" name="picture_file" accept="image/*">
+                  <small class="text-muted d-block mt-2">Choose an image file (JPG, PNG, GIF). Max 2MB.</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Username (read-only) -->
+            <div class="mb-3">
+              <label for="username" class="form-label">Username <span class="text-muted small">(read-only)</span></label>
+              <input type="text" class="form-control" id="username" value="{{ user['username'] }}" disabled>
+            </div>
+
+            <!-- Name Fields -->
             <div class="row mb-3">
               <div class="col-md-6">
                 <label for="first-name" class="form-label">First Name</label>
@@ -64,26 +91,57 @@
               </div>
             </div>
 
+            <!-- Email -->
             <div class="mb-3">
               <label for="email" class="form-label">Email Address</label>
               <input type="email" class="form-control" id="email" name="email" value="{{ (user['email'] or '') }}">
             </div>
 
+            <!-- Phone Number -->
             <div class="mb-3">
-              <label for="username" class="form-label">Username <span class="text-muted small">(read-only)</span></label>
-              <input type="text" class="form-control" id="username" value="{{ user['username'] }}" disabled>
+              <label for="phone-number" class="form-label">Phone Number</label>
+              <input type="tel" class="form-control" id="phone-number" name="phone_number" value="{{ (user['phone_number'] or '') }}" placeholder="+1 (555) 000-0000">
             </div>
 
-            <div class="mb-3">
-              <label for="avatar-url" class="form-label">Profile Picture URL</label>
-              <input type="url" class="form-control" id="avatar-url" name="avatar_url" value="{{ (user['avatar_url'] or '') }}" placeholder="https://example.com/image.jpg">
-              <small class="text-muted d-block mt-1">Enter a direct image URL. A square image (200x200px or larger) works best.</small>
+            <!-- Country & Gender -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="country" class="form-label">Country</label>
+                <select class="form-select" id="country" name="country">
+                  <option value="">Select a country...</option>
+                  <option value="United States" {% if (user['country'] or '') == 'United States' %}selected{% endif %}>United States</option>
+                  <option value="Canada" {% if (user['country'] or '') == 'Canada' %}selected{% endif %}>Canada</option>
+                  <option value="United Kingdom" {% if (user['country'] or '') == 'United Kingdom' %}selected{% endif %}>United Kingdom</option>
+                  <option value="Australia" {% if (user['country'] or '') == 'Australia' %}selected{% endif %}>Australia</option>
+                  <option value="Germany" {% if (user['country'] or '') == 'Germany' %}selected{% endif %}>Germany</option>
+                  <option value="France" {% if (user['country'] or '') == 'France' %}selected{% endif %}>France</option>
+                  <option value="Japan" {% if (user['country'] or '') == 'Japan' %}selected{% endif %}>Japan</option>
+                  <option value="China" {% if (user['country'] or '') == 'China' %}selected{% endif %}>China</option>
+                  <option value="India" {% if (user['country'] or '') == 'India' %}selected{% endif %}>India</option>
+                  <option value="Brazil" {% if (user['country'] or '') == 'Brazil' %}selected{% endif %}>Brazil</option>
+                  <option value="Other" {% if (user['country'] or '') == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="gender" class="form-label">Gender</label>
+                <select class="form-select" id="gender" name="gender">
+                  <option value="">Prefer not to say</option>
+                  <option value="Male" {% if (user['gender'] or '') == 'Male' %}selected{% endif %}>Male</option>
+                  <option value="Female" {% if (user['gender'] or '') == 'Female' %}selected{% endif %}>Female</option>
+                  <option value="Other" {% if (user['gender'] or '') == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+              </div>
             </div>
 
-            <div class="mb-3" id="avatar-preview" style="display: none;">
-              <label class="form-label">Preview</label>
-              <div class="text-center">
-                <img id="preview-image" src="" alt="Preview" class="rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+            <!-- Birth Date & Birth Place -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="birth-date" class="form-label">Date of Birth</label>
+                <input type="date" class="form-control" id="birth-date" name="birth_date" value="{{ (user['birth_date'] or '') }}">
+              </div>
+              <div class="col-md-6">
+                <label for="birth-place" class="form-label">Place of Birth</label>
+                <input type="text" class="form-control" id="birth-place" name="birth_place" value="{{ (user['birth_place'] or '') }}" placeholder="City, Country">
               </div>
             </div>
 
@@ -158,15 +216,6 @@
         </div>
       </div>
 
-      <!-- Educational Diagram -->
-      <div class="card shadow-sm mt-3">
-        <div class="card-header bg-white fw-semibold">
-          <i class="bi bi-diagram-3 me-2 text-primary"></i>How Federation Works
-        </div>
-        <div class="card-body text-center">
-          <img src="{{ url_for('static', filename='images/federation-diagram.svg') }}" alt="Federation Diagram" class="img-fluid" style="max-width: 100%; border-radius: 8px;">
-        </div>
-      </div>
     </div>
 
   </div>
@@ -174,22 +223,25 @@
 </div>
 
 <script>
-// Avatar preview
-const avatarInput = document.getElementById('avatar-url');
-const previewDiv = document.getElementById('avatar-preview');
-const previewImage = document.getElementById('preview-image');
+// Profile picture preview
+const pictureInput = document.getElementById('picture-upload');
+const currentPictureContainer = document.getElementById('profile-picture-container');
 
-avatarInput.addEventListener('change', function() {
-  if (this.value && this.value.trim()) {
-    previewImage.src = this.value;
-    previewImage.onerror = function() {
-      previewDiv.style.display = 'none';
+pictureInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = document.createElement('img');
+      img.src = event.target.result;
+      img.className = 'rounded-circle';
+      img.style.width = '100px';
+      img.style.height = '100px';
+      img.style.objectFit = 'cover';
+      currentPictureContainer.innerHTML = '';
+      currentPictureContainer.appendChild(img);
     };
-    previewImage.onload = function() {
-      previewDiv.style.display = 'block';
-    };
-  } else {
-    previewDiv.style.display = 'none';
+    reader.readAsDataURL(file);
   }
 });
 
@@ -197,13 +249,7 @@ avatarInput.addEventListener('change', function() {
 document.getElementById('profile-form').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(this);
-  const payload = {
-    first_name: formData.get('first_name') || null,
-    last_name: formData.get('last_name') || null,
-    email: formData.get('email') || null,
-    avatar_url: formData.get('avatar_url') || null,
-  };
-
+  
   const btn = document.getElementById('btn-save');
   const originalText = btn.innerHTML;
   btn.disabled = true;
@@ -211,8 +257,7 @@ document.getElementById('profile-form').addEventListener('submit', function(e) {
 
   fetch('/user/profile', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: formData,  // Send as FormData to handle file upload
   })
     .then(r => r.json())
     .then(data => {
@@ -220,8 +265,8 @@ document.getElementById('profile-form').addEventListener('submit', function(e) {
         alert('Error: ' + data.error);
       } else {
         alert('Profile updated successfully!');
-        // Optionally reload page to show new data
-        // window.location.reload();
+        // Optionally reload to show updated picture
+        window.location.reload();
       }
     })
     .catch(err => {

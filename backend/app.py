@@ -45,6 +45,7 @@ from flask import (
     url_for,
 )
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 from federation import FederationAgent, federation_payload_signature
 from membership import MembershipManager
@@ -60,6 +61,12 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 DATABASE = os.environ.get("DATABASE", "/data/db/portal.db")
 NODE_ID = os.environ.get("NODE_ID", "node-1")
 NEIGHBOUR_ENV = os.environ.get("NEIGHBOR_NODES", "")
+
+# Setup profile picture uploads directory
+UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_UPLOAD_SIZE = 2 * 1024 * 1024  # 2MB
 
 federation = FederationAgent(
     node_id=NODE_ID,
@@ -84,13 +91,32 @@ FEDERATION_SHARED_SECRET = os.environ.get("FEDERATION_SHARED_SECRET", "").strip(
 
 
 def _ensure_schema_migrations(db: sqlite3.Connection) -> None:
-    """Apply lightweight schema migrations for federation security metadata."""
+    """Apply lightweight schema migrations for federation security metadata and profile fields."""
+    # Check and add federation_nodes.shared_secret
     existing_cols = {
         row["name"]
         for row in db.execute("PRAGMA table_info(federation_nodes)").fetchall()
     }
     if "shared_secret" not in existing_cols:
         db.execute("ALTER TABLE federation_nodes ADD COLUMN shared_secret TEXT")
+    
+    # Check and add users profile columns
+    users_cols = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(users)").fetchall()
+    }
+    if "profile_picture" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN profile_picture TEXT")
+    if "phone_number" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN phone_number TEXT")
+    if "country" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN country TEXT")
+    if "gender" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN gender TEXT")
+    if "birth_date" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN birth_date TEXT")
+    if "birth_place" not in users_cols:
+        db.execute("ALTER TABLE users ADD COLUMN birth_place TEXT")
 
     db.execute(
         """
@@ -578,7 +604,7 @@ def personal_profile():
 @app.route("/user/profile", methods=["PATCH"])
 @login_required
 def update_user_profile():
-    """Update user profile information (first name, last name, email, avatar)."""
+    """Update user profile information including file upload."""
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
     if not user or not user["is_active"]:
@@ -586,22 +612,49 @@ def update_user_profile():
         return jsonify({"error": "User not found"}), 404
 
     try:
-        data = request.get_json() or {}
-        first_name = data.get("first_name")
-        last_name = data.get("last_name")
-        email = data.get("email")
-        avatar_url = data.get("avatar_url")
+        # Handle file upload if present
+        profile_picture = user["profile_picture"]
+        if "picture_file" in request.files:
+            file = request.files["picture_file"]
+            if file and file.filename != "":
+                # Validate file
+                if not allowed_file(file.filename):
+                    return jsonify({"error": "Invalid file type. Allowed: PNG, JPG, JPEG, GIF"}), 400
+                if len(file.getvalue()) > MAX_UPLOAD_SIZE:
+                    return jsonify({"error": "File too large. Max 2MB."}), 400
+                
+                # Save file with unique name
+                filename = f"{session['user_id']}_{secrets.token_hex(4)}_{secure_filename(file.filename)}"
+                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                file.save(filepath)
+                profile_picture = filename
+
+        # Extract form fields
+        first_name = request.form.get("first_name")
+        last_name = request.form.get("last_name")
+        email = request.form.get("email")
+        phone_number = request.form.get("phone_number")
+        country = request.form.get("country")
+        gender = request.form.get("gender")
+        birth_date = request.form.get("birth_date")
+        birth_place = request.form.get("birth_place")
 
         db.execute(
             """UPDATE users 
-               SET first_name = ?, last_name = ?, email = ?, avatar_url = ? 
+               SET first_name = ?, last_name = ?, email = ?, profile_picture = ?,
+                   phone_number = ?, country = ?, gender = ?, birth_date = ?, birth_place = ?
                WHERE id = ?""",
-            (first_name, last_name, email, avatar_url, session["user_id"]),
+            (first_name, last_name, email, profile_picture, phone_number, country, gender, birth_date, birth_place, session["user_id"]),
         )
         db.commit()
         return jsonify({"message": "Profile updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def allowed_file(filename):
+    """Check if file extension is allowed."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @app.route("/user/request-trust-validation", methods=["POST"])
