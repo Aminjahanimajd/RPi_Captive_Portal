@@ -247,20 +247,31 @@
 
             <div class="row g-3 mt-1">
               <div class="col-md-4">
-                <div id="layer-auth-card" class="security-layer-card h-100" data-pass="{{ 1 if user['is_active'] else 0 }}">
+                <div id="layer-auth-card" class="security-layer-card h-100" data-pass="{{ 1 if session else 0 }}">
                   <div class="d-flex align-items-center justify-content-between">
                     <h6 class="mb-0">Layer 1: Authentication</h6>
                     <span id="layer-auth-status" class="badge {% if user['is_active'] %}bg-success{% else %}bg-danger{% endif %}">
+                      {% if session %}Passed{% else %}Blocked{% endif %}
+                    </span>
+                  </div>
+                  <p class="mb-0 text-muted small mt-2">User session is valid and authenticated.</p>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div id="layer-status-card" class="security-layer-card h-100" data-pass="{{ 1 if user['is_active'] else 0 }}">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0">Layer 2: Account Status</h6>
+                    <span id="layer-status-status" class="badge {% if user['is_active'] %}bg-success{% else %}bg-danger{% endif %}">
                       {% if user['is_active'] %}Passed{% else %}Blocked{% endif %}
                     </span>
                   </div>
-                  <p class="mb-0 text-muted small mt-2">User session and account status validation.</p>
+                  <p class="mb-0 text-muted small mt-2">Account is active and not suspended.</p>
                 </div>
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <div id="layer-device-card" class="security-layer-card h-100" data-pass="{{ 1 if device and device['is_authorized'] else 0 }}">
                   <div class="d-flex align-items-center justify-content-between">
-                    <h6 class="mb-0">Layer 2: Device Trust</h6>
+                    <h6 class="mb-0">Layer 3: Device Authorization</h6>
                     <span id="layer-device-status" class="badge {% if device and device['is_authorized'] %}bg-success{% else %}bg-danger{% endif %}">
                       {% if device and device['is_authorized'] %}Passed{% else %}Blocked{% endif %}
                     </span>
@@ -269,21 +280,34 @@
                     {% if device and device['is_authorized'] %}
                       This device is authorized for secure access.
                     {% else %}
-                      Device approval is required from an administrator.
+                      Admin must approve this device before access.
                     {% endif %}
                   </p>
                 </div>
               </div>
-              <div class="col-md-4">
-                <div id="layer-federation-card" class="security-layer-card h-100">
+              <div class="col-md-3">
+                <div id="layer-federation-card" class="security-layer-card h-100" data-pass="{{ 1 if security_state['layer4_pass'] else 0 }}">
                   <div class="d-flex align-items-center justify-content-between">
-                    <h6 class="mb-0">Layer 3: Federation Readiness</h6>
+                    <h6 class="mb-0">Layer 4: Federation Trust</h6>
                     <span id="layer-federation-status" class="badge {% if security_state['is_ready'] %}bg-success{% else %}bg-danger{% endif %}">
-                      {% if security_state['is_ready'] %}Passed{% else %}Blocked{% endif %}
+                      {% if security_state['layer4_pass'] %}Passed{% else %}Blocked{% endif %}
                     </span>
                   </div>
                   <p id="layer-federation-message" class="mb-0 text-muted small mt-2">
-                    Trusted peers: {{ security_state['trusted_peers'] }}, shards: {{ security_state['peer_shards_collected'] }}/{{ security_state['required_peer_shards'] }}.
+                    At least 1 trusted peer node exists.
+                  </p>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div id="layer-crypto-card" class="security-layer-card h-100" data-pass="{{ 1 if security_state['layer5_pass'] else 0 }}">
+                  <div class="d-flex align-items-center justify-content-between">
+                    <h6 class="mb-0">Layer 5: Cryptographic</h6>
+                    <span id="layer-crypto-status" class="badge {% if security_state['layer5_pass'] %}bg-success{% else %}bg-danger{% endif %}">
+                      {% if security_state['layer5_pass'] %}Passed{% else %}Blocked{% endif %}
+                    </span>
+                  </div>
+                  <p id="layer-crypto-message" class="mb-0 text-muted small mt-2">
+                    Master key reconstructed: {{ security_state['peer_shards_collected'] }}/{{ security_state['required_peer_shards'] }} shards.
                   </p>
                 </div>
               </div>
@@ -386,15 +410,22 @@ function applySecurityState(state) {
   const overallBadge = document.getElementById('security-overall-badge');
   const authCard = document.getElementById('layer-auth-card');
   const authStatus = document.getElementById('layer-auth-status');
+    const statusCard = document.getElementById('layer-status-card');
+    const statusStatus = document.getElementById('layer-status-status');
   const deviceCard = document.getElementById('layer-device-card');
   const deviceStatus = document.getElementById('layer-device-status');
   const deviceMessage = document.getElementById('layer-device-message');
   const federationCard = document.getElementById('layer-federation-card');
   const federationStatus = document.getElementById('layer-federation-status');
-  const federationMessage = document.getElementById('layer-federation-message');
+  const cryptoCard = document.getElementById('layer-crypto-card');
+  const cryptoStatus = document.getElementById('layer-crypto-status');
+  const cryptoMessage = document.getElementById('layer-crypto-message');
   const designNote = document.getElementById('security-design-note');
-  const authPass = authCard ? authCard.getAttribute('data-pass') === '1' : true;
-  const devicePass = deviceCard ? deviceCard.getAttribute('data-pass') === '1' : true;
+  const authPass = secure.layer1_pass ?? true;
+  const statusPass = secure.layer2_pass ?? true;
+  const devicePass = secure.layer3_pass ?? true;
+  const federationPass = secure.layer4_pass ?? false;
+  const cryptoPass = secure.layer5_pass ?? false;
 
   if (partitionIcon) {
     partitionIcon.className = 'bi ' + (ready ? 'bi-unlock-fill text-success' : 'bi-lock-fill text-warning') + ' fs-2';
@@ -411,17 +442,31 @@ function applySecurityState(state) {
   if (trustedPeers) trustedPeers.textContent = secure.trusted_peers ?? 0;
 
   if (federationStatus) {
-    federationStatus.textContent = ready ? 'Passed' : 'Blocked';
-    federationStatus.className = 'badge ' + (ready ? 'bg-success' : 'bg-danger');
+    federationStatus.textContent = federationPass ? 'Passed' : 'Blocked';
+    federationStatus.className = 'badge ' + (federationPass ? 'bg-success' : 'bg-danger');
   }
-  if (federationMessage) {
-    federationMessage.textContent = 'Trusted peers: ' + (secure.trusted_peers ?? 0)
-      + ', shards: ' + (secure.peer_shards_collected ?? 0)
-      + '/' + (secure.required_peer_shards ?? 1) + '.';
+
+  if (statusCard && statusStatus) {
+    statusStatus.textContent = statusPass ? 'Passed' : 'Blocked';
+    statusStatus.className = 'badge ' + (statusPass ? 'bg-success' : 'bg-danger');
+    statusCard.classList.remove('is-pass', 'is-fail');
+    statusCard.classList.add(statusPass ? 'is-pass' : 'is-fail');
   }
+
   if (federationCard) {
     federationCard.classList.remove('is-pass', 'is-fail');
-    federationCard.classList.add(ready ? 'is-pass' : 'is-fail');
+    federationCard.classList.add(federationPass ? 'is-pass' : 'is-fail');
+  }
+
+  if (cryptoCard && cryptoStatus) {
+    cryptoStatus.textContent = cryptoPass ? 'Passed' : 'Blocked';
+    cryptoStatus.className = 'badge ' + (cryptoPass ? 'bg-success' : 'bg-danger');
+    cryptoCard.classList.remove('is-pass', 'is-fail');
+    cryptoCard.classList.add(cryptoPass ? 'is-pass' : 'is-fail');
+    if (cryptoMessage) {
+      cryptoMessage.textContent = 'Master key: ' + (secure.peer_shards_collected ?? 0)
+        + '/' + (secure.required_peer_shards ?? 1) + ' shards collected.';
+    }
   }
 
   if (authCard && authStatus) {
@@ -439,11 +484,11 @@ function applySecurityState(state) {
     if (deviceMessage) {
       deviceMessage.textContent = devicePass
         ? 'This device is authorized for secure access.'
-        : 'Device approval is required from an administrator.';
+          : 'Admin must approve this device before access.';
     }
   }
 
-  const allLayersPass = authPass && devicePass && ready;
+        const allLayersPass = authPass && statusPass && devicePass && federationPass && cryptoPass;
   if (overallTitle) {
     overallTitle.textContent = allLayersPass ? 'Access Decision: Granted' : 'Access Decision: Conditional';
     overallTitle.className = 'mb-1 fw-bold ' + (allLayersPass ? 'text-success' : 'text-warning');

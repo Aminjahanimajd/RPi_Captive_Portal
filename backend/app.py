@@ -362,6 +362,34 @@ def _build_logical_graph(db: sqlite3.Connection) -> dict:
 
 def _build_secure_access_state() -> dict:
     """Summarize whether secure files should be visible and accessible."""
+    """Summarize whether secure files should be visible and accessible.
+    
+    Returns detailed layer-by-layer security state (5 layers):
+    1. Authentication - User session valid
+    2. Account Status - User account is active
+    3. Device Authorization - Device approved by admin
+    4. Federation Trust - Trusted peers exist
+    5. Cryptographic Readiness - Master key reconstructed
+    """
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE id = ?", (session.get("user_id"),)).fetchone()
+    
+    # Layer 1: Authentication (handled by @login_required decorator)
+    layer1_pass = user is not None
+    
+    # Layer 2: Account Status - User account must be active
+    layer2_pass = layer1_pass and user.get("is_active", 0) == 1
+    
+    # Layer 3: Device Authorization - Device must be explicitly approved
+    device = None
+    layer3_pass = False
+    if layer2_pass and user.get("mac_address"):
+        device = db.execute(
+            "SELECT * FROM devices WHERE mac_address = ?",
+            (user["mac_address"],)
+        ).fetchone()
+        layer3_pass = device is not None and device.get("is_authorized", 0) == 1
+    
     federation_state = federation.get_status()
     membership_state = membership.summary()
 
@@ -371,24 +399,46 @@ def _build_secure_access_state() -> dict:
     peer_shards_collected = int(federation_state.get("shards_collected", 0))
     required_peer_shards = max(threshold_k - 1, 1)
 
-    reasons = []
-    if trusted_peer_count < 1:
-        reasons.append("Add and trust at least one neighbour node")
-    if peer_shards_collected < required_peer_shards:
-        reasons.append(
-            f"Collect at least {required_peer_shards} shard(s) from trusted neighbours"
-        )
-    if not federation_state.get("is_mounted"):
-        reasons.append("Secure partition is not mounted yet")
-    if not federation_state.get("has_master_key"):
-        reasons.append("Master key has not been reconstructed yet")
+    # Layer 4: Federation Trust - Must have trusted peer nodes
+    layer4_pass = trusted_peer_count >= 1
+    
+    # Layer 5: Cryptographic Readiness - Must have reconstructed master key
+    layer5_pass = (
+        peer_shards_collected >= required_peer_shards
+        and federation_state.get("is_mounted")
+        and federation_state.get("has_master_key")
+    )
 
-    is_ready = not reasons
+    reasons = []
+    if not layer1_pass:
+        reasons.append("User session is not authenticated")
+    if not layer2_pass:
+        reasons.append("User account is not active or suspended")
+    if not layer3_pass:
+        reasons.append("Device must be authorized by an administrator")
+    if not layer4_pass:
+        reasons.append("Add and trust at least one neighbour node")
+    if not layer5_pass:
+        if peer_shards_collected < required_peer_shards:
+            reasons.append(
+                f"Collect at least {required_peer_shards} shard(s) from trusted neighbours"
+            )
+        if not federation_state.get("is_mounted"):
+            reasons.append("Secure partition is not mounted")
+        if not federation_state.get("has_master_key"):
+            reasons.append("Master key has not been reconstructed")
+
+    is_ready = all([layer1_pass, layer2_pass, layer3_pass, layer4_pass, layer5_pass])
     return {
         "is_ready": is_ready,
         "status_label": "Ready" if is_ready else "Locked",
         "status_message": "Secure files are available" if is_ready else reasons[0],
         "reasons": reasons,
+        "layer1_pass": layer1_pass,
+        "layer2_pass": layer2_pass,
+        "layer3_pass": layer3_pass,
+        "layer4_pass": layer4_pass,
+        "layer5_pass": layer5_pass,
         "trusted_members": trusted_members,
         "trusted_peers": trusted_peer_count,
         "peer_shards_collected": peer_shards_collected,
@@ -1398,18 +1448,36 @@ def _get_client_mac(req) -> str | None:
 
 def _upsert_device(db, mac, ip: str, user_id: int) -> None:
     """Insert or update a device record and mark it as authorised."""
+    """Insert or update a device record.
+    
+    NEW devices default to is_authorized=0 and require admin approval.
+    EXISTING devices keep their authorization status unchanged.
+    """
     if not mac:
         return
-    db.execute(
-        """INSERT INTO devices (mac_address, ip_address, user_id, is_authorized)
-           VALUES (?, ?, ?, 1)
-           ON CONFLICT(mac_address) DO UPDATE SET
-               ip_address   = excluded.ip_address,
-               user_id      = excluded.user_id,
-               is_authorized = 1,
-               last_seen    = CURRENT_TIMESTAMP""",
-        (mac, ip, user_id),
-    )
+    # Check if device already exists
+    existing = db.execute(
+        "SELECT is_authorized FROM devices WHERE mac_address = ?",
+        (mac,)
+    ).fetchone()
+    
+    if existing:
+        # Update existing device, preserve authorization status
+        db.execute(
+            """UPDATE devices SET
+                   ip_address = ?,
+                   user_id = ?,
+                   last_seen = CURRENT_TIMESTAMP
+               WHERE mac_address = ?""",
+            (ip, user_id, mac),
+        )
+    else:
+        # Insert new device with is_authorized=0 (requires admin approval)
+        db.execute(
+            """INSERT INTO devices (mac_address, ip_address, user_id, is_authorized)
+               VALUES (?, ?, ?, 0)""",
+            (mac, ip, user_id),
+        )
 
 
 def _log_access(db, identifier: str, action: str, ip: str) -> None:
