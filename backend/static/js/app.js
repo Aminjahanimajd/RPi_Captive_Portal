@@ -117,6 +117,7 @@ async function addNode() {
   const hostname = document.getElementById('new-node-hostname').value.trim();
   const ip       = document.getElementById('new-node-ip').value.trim();
   const port     = parseInt(document.getElementById('new-node-port').value, 10) || 5000;
+  const secret   = document.getElementById('new-node-secret').value.trim();
 
   if (!nodeId || !hostname || !ip) {
     alert('Node ID, hostname, and IP address are required.');
@@ -124,10 +125,80 @@ async function addNode() {
   }
 
   const data = await adminPost('/admin/nodes', {
-    node_id: nodeId, hostname, ip_address: ip, port,
+    node_id: nodeId, hostname, ip_address: ip, port, shared_secret: secret,
   });
   if (data) {
     bootstrap.Modal.getInstance(document.getElementById('addNodeModal')).hide();
     location.reload();
   }
 }
+
+/* ── Logical Graph ───────────────────────────────────────────────────────── */
+
+function renderLogicalGraph(payload) {
+  const panel = document.getElementById('logical-graph-panel');
+  if (!panel) return;
+
+  const graph = payload.graph || { nodes: [], edges: [] };
+  const summary = payload.summary || {};
+
+  const nodeChips = (graph.nodes || []).map(node => {
+    const state = node.is_local ? 'Local' : (node.is_trusted ? 'Trusted' : 'Observed');
+    const badgeClass = node.is_local ? 'bg-primary' : (node.is_trusted ? 'bg-success' : 'bg-secondary');
+    return `<span class="badge ${badgeClass} me-1 mb-1">${node.id} • ${state}</span>`;
+  }).join('');
+
+  const edgeRows = (graph.edges || []).map(edge => {
+    const score = typeof edge.score === 'number' ? edge.score.toFixed(3) : '-';
+    return `<tr>
+      <td>${edge.source}</td>
+      <td>${edge.target}</td>
+      <td>${edge.type}</td>
+      <td>${edge.status || '-'}</td>
+      <td>${score}</td>
+    </tr>`;
+  }).join('');
+
+  panel.innerHTML = `
+    <div class="mb-2">
+      <span class="me-3"><strong>Nodes:</strong> ${summary.node_count || 0}</span>
+      <span class="me-3"><strong>Edges:</strong> ${summary.edge_count || 0}</span>
+      <span><strong>Trusted:</strong> ${summary.trusted_count || 0}</span>
+    </div>
+    <div class="mb-2">${nodeChips || '<span class="text-muted">No nodes</span>'}</div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr><th>Source</th><th>Target</th><th>Type</th><th>Status</th><th>Score</th></tr>
+        </thead>
+        <tbody>
+          ${edgeRows || '<tr><td colspan="5" class="text-muted">No edges</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+async function loadLogicalFederationGraph() {
+  const panel = document.getElementById('logical-graph-panel');
+  if (!panel) return;
+
+  panel.textContent = 'Loading graph...';
+  try {
+    const resp = await fetch('/admin/graph');
+    const data = await resp.json();
+    if (!resp.ok) {
+      panel.textContent = `Graph load failed: ${data.error || resp.statusText}`;
+      return;
+    }
+    renderLogicalGraph(data);
+  } catch (_err) {
+    panel.textContent = 'Graph load failed due to network/server error.';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('logical-graph-panel')) {
+    loadLogicalFederationGraph();
+  }
+});

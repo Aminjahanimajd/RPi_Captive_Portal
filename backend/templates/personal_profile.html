@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}Personal Profile — {{ user['username'] }}{% endblock %}
+
+{% block content %}
+<!-- Navbar -->
+<nav class="navbar navbar-dark bg-primary">
+  <div class="container">
+    <span class="navbar-brand fw-bold"><i class="bi bi-wifi me-2"></i>WiFi Portal</span>
+    <div class="d-flex align-items-center gap-3">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+      </a>
+      <a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-light">
+        <i class="bi bi-box-arrow-right me-1"></i>Logout
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container py-4">
+
+  <!-- Banner -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 bg-primary text-white shadow">
+        <div class="card-body d-flex align-items-center gap-4 py-4">
+          <div>
+            {% if user['avatar_url'] %}
+            <img src="{{ user['avatar_url'] }}" alt="Profile" class="rounded-circle" style="width: 80px; height: 80px; object-fit: cover;">
+            {% else %}
+            <div class="display-4"><i class="bi bi-person-circle"></i></div>
+            {% endif %}
+          </div>
+          <div>
+            <h4 class="mb-1 fw-bold">{{ (user['first_name'] or user['username']) }} {{ (user['last_name'] or '') }}</h4>
+            <p class="mb-0 text-white-75">
+              <i class="bi bi-at me-1"></i>
+              <code>@{{ user['username'] }}</code>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Personal Information -->
+    <div class="col-lg-8">
+      <div class="card h-100 shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-person me-2 text-primary"></i>Personal Information
+        </div>
+        <div class="card-body">
+          <form id="profile-form">
+            <!-- Profile Picture Upload -->
+            <div class="mb-4 pb-3 border-bottom">
+              <label class="form-label fw-semibold">Profile Picture</label>
+              <div class="d-flex align-items-center gap-3">
+                <div id="profile-picture-container" class="text-center">
+                  {% if user['profile_picture'] %}
+                  <img id="current-picture" src="{{ url_for('static', filename='uploads/' + user['profile_picture']) }}" alt="Profile" class="rounded-circle" style="width: 100px; height: 100px; object-fit: cover;">
+                  {% else %}
+                  <div id="current-picture" class="rounded-circle d-flex align-items-center justify-content-center bg-light" style="width: 100px; height: 100px;">
+                    <i class="bi bi-person-circle text-secondary" style="font-size: 2rem;"></i>
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="flex-grow-1">
+                  <input type="file" class="form-control" id="picture-upload" name="picture_file" accept="image/*">
+                  <small class="text-muted d-block mt-2">Choose an image file (JPG, PNG, GIF). Max 2MB.</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Username (read-only) -->
+            <div class="mb-3">
+              <label for="username" class="form-label">Username <span class="text-muted small">(read-only)</span></label>
+              <input type="text" class="form-control" id="username" value="{{ user['username'] }}" disabled>
+            </div>
+
+            <!-- Name Fields -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="first-name" class="form-label">First Name</label>
+                <input type="text" class="form-control" id="first-name" name="first_name" value="{{ (user['first_name'] or '') }}">
+              </div>
+              <div class="col-md-6">
+                <label for="last-name" class="form-label">Last Name</label>
+                <input type="text" class="form-control" id="last-name" name="last_name" value="{{ (user['last_name'] or '') }}">
+              </div>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+              <label for="email" class="form-label">Email Address</label>
+              <input type="email" class="form-control" id="email" name="email" value="{{ (user['email'] or '') }}">
+            </div>
+
+            <!-- Phone Number -->
+            <div class="mb-3">
+              <label for="phone-number" class="form-label">Phone Number</label>
+              <input type="tel" class="form-control" id="phone-number" name="phone_number" value="{{ (user['phone_number'] or '') }}" placeholder="+1 (555) 000-0000">
+            </div>
+
+            <!-- Country & Gender -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="country" class="form-label">Country</label>
+                <select class="form-select" id="country" name="country">
+                  <option value="">Select a country...</option>
+                  <option value="United States" {% if (user['country'] or '') == 'United States' %}selected{% endif %}>United States</option>
+                  <option value="Canada" {% if (user['country'] or '') == 'Canada' %}selected{% endif %}>Canada</option>
+                  <option value="United Kingdom" {% if (user['country'] or '') == 'United Kingdom' %}selected{% endif %}>United Kingdom</option>
+                  <option value="Australia" {% if (user['country'] or '') == 'Australia' %}selected{% endif %}>Australia</option>
+                  <option value="Germany" {% if (user['country'] or '') == 'Germany' %}selected{% endif %}>Germany</option>
+                  <option value="France" {% if (user['country'] or '') == 'France' %}selected{% endif %}>France</option>
+                  <option value="Japan" {% if (user['country'] or '') == 'Japan' %}selected{% endif %}>Japan</option>
+                  <option value="China" {% if (user['country'] or '') == 'China' %}selected{% endif %}>China</option>
+                  <option value="India" {% if (user['country'] or '') == 'India' %}selected{% endif %}>India</option>
+                  <option value="Brazil" {% if (user['country'] or '') == 'Brazil' %}selected{% endif %}>Brazil</option>
+                  <option value="Other" {% if (user['country'] or '') == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label for="gender" class="form-label">Gender</label>
+                <select class="form-select" id="gender" name="gender">
+                  <option value="">Prefer not to say</option>
+                  <option value="Male" {% if (user['gender'] or '') == 'Male' %}selected{% endif %}>Male</option>
+                  <option value="Female" {% if (user['gender'] or '') == 'Female' %}selected{% endif %}>Female</option>
+                  <option value="Other" {% if (user['gender'] or '') == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Birth Date & Birth Place -->
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <label for="birth-date" class="form-label">Date of Birth</label>
+                <input type="date" class="form-control" id="birth-date" name="birth_date" value="{{ (user['birth_date'] or '') }}">
+              </div>
+              <div class="col-md-6">
+                <label for="birth-place" class="form-label">Place of Birth</label>
+                <input type="text" class="form-control" id="birth-place" name="birth_place" value="{{ (user['birth_place'] or '') }}" placeholder="City, Country">
+              </div>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary" id="btn-save">
+                <i class="bi bi-check-lg me-1"></i>Save Changes
+              </button>
+              <button type="reset" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg me-1"></i>Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Account Summary -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-info-circle me-2 text-primary"></i>Account Summary
+        </div>
+        <div class="card-body">
+          <table class="table table-sm mb-0">
+            <tbody>
+              <tr>
+                <td class="text-muted">Role</td>
+                <td><span class="badge bg-secondary">{{ user['role'] or 'user' }}</span></td>
+              </tr>
+              <tr>
+                <td class="text-muted">Status</td>
+                <td>
+                  {% if user['is_active'] %}
+                  <span class="badge bg-success">Active</span>
+                  {% else %}
+                  <span class="badge bg-danger">Inactive</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td class="text-muted">Registered</td>
+                <td><small>{{ user['created_at'] or 'Unknown' }}</small></td>
+              </tr>
+              <tr>
+                <td class="text-muted">Primary Device</td>
+                <td>
+                  {% if device and device['mac_address'] %}
+                  <code style="font-size: 0.75rem;">{{ device['mac_address'] }}</code>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trust Request (Optional Feature) -->
+      <div class="card shadow-sm mt-3">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-shield-check me-2 text-info"></i>Trust & Validation
+        </div>
+        <div class="card-body">
+          <p class="mb-3 small text-muted">
+            Administrators can validate your identity and authorize your devices for access to secured resources.
+          </p>
+          <button type="button" class="btn btn-sm btn-outline-info" id="btn-request-validation" onclick="requestTrustValidation()">
+            <i class="bi bi-hand-thumbs-up me-1"></i>Request Validation
+          </button>
+          <small id="validation-status" class="d-block mt-2 text-muted" style="display: none;"></small>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// Profile picture preview
+const pictureInput = document.getElementById('picture-upload');
+const currentPictureContainer = document.getElementById('profile-picture-container');
+
+pictureInput.addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = document.createElement('img');
+      img.src = event.target.result;
+      img.className = 'rounded-circle';
+      img.style.width = '100px';
+      img.style.height = '100px';
+      img.style.objectFit = 'cover';
+      currentPictureContainer.innerHTML = '';
+      currentPictureContainer.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+// Form submission
+document.getElementById('profile-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  
+  const btn = document.getElementById('btn-save');
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Saving...';
+
+  fetch('/user/profile', {
+    method: 'PATCH',
+    body: formData,  // Send as FormData to handle file upload
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        alert('Error: ' + data.error);
+      } else {
+        alert('Profile updated successfully!');
+        // Optionally reload to show updated picture
+        window.location.reload();
+      }
+    })
+    .catch(err => {
+      alert('Failed to save profile: ' + err.message);
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    });
+});
+
+// Trust validation request
+function requestTrustValidation() {
+  const statusEl = document.getElementById('validation-status');
+  const btn = document.getElementById('btn-request-validation');
+  const originalText = btn.innerHTML;
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Submitting...';
+  statusEl.style.display = 'block';
+  statusEl.textContent = 'Processing...';
+
+  fetch('/user/request-trust-validation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        statusEl.textContent = '❌ ' + data.error;
+        statusEl.className = 'd-block mt-2 text-danger small';
+      } else {
+        statusEl.textContent = '✓ ' + (data.message || 'Request submitted. Admins will review your request.');
+        statusEl.className = 'd-block mt-2 text-success small';
+      }
+    })
+    .catch(err => {
+      statusEl.textContent = '❌ Failed: ' + err.message;
+      statusEl.className = 'd-block mt-2 text-danger small';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    });
+}
+</script>
+{% endblock %}

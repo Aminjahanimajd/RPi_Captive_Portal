@@ -1,2 +1,23 @@
 instructions.txt
 project_0_to_100_guide.txt
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+
+# Local virtual environments
+.venv/
+venv/
+
+# Local environment files
+.env
+.env.*
+
+# Local databases and logs
+*.db
+*.sqlite3
+*.log
+
+# Local runtime/generated artifacts
+data/
+*.tmp

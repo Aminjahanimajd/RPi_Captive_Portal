@@ -1,36 +1,35 @@
-version: '3.8'
-
 # ──────────────────────────────────────────────────────────────────────────────
-# WiFi Captive Portal — Docker Compose
+# WiFi Captive Portal — Docker Compose (Development Convenience)
 #
-# Two services demonstrate the federated key-shard architecture:
+# Two services demonstrate the federated key-shard architecture for local testing:
 #   portal   — primary node (acts as captive portal gateway)
 #   neighbor — secondary node (holds one key shard for portal's filesystem)
 #
 # Both nodes exchange shards on boot so each can reconstruct the master key
 # and mount its secure filesystem partition.
 #
-# On a real Raspberry Pi deployment you would:
-#   1. Run `docker compose up -d` on each Pi.
-#   2. Set NEIGHBOR_NODES to the IP:port of the other Pi nodes.
-#   3. Configure hostapd + iptables via scripts/setup_hotspot.sh
-#      so all captive-portal traffic is redirected to port 5000.
+# Production path is singleton Python venv profiles (linux-rpi-venv/windows-venv).
+# This file is kept as optional dev/test-only convenience.
 # ──────────────────────────────────────────────────────────────────────────────
 
 services:
 
   portal:
     build: ./backend
-    container_name: captive_portal
     ports:
       - "5000:5000"
     volumes:
       - portal_data:/data
     environment:
       - NODE_ID=node-1
+      - RUNTIME_PROFILE=docker-dev
       - NODE_HOST=portal
       - NEIGHBOR_NODES=neighbor:5000
       - SECRET_KEY=CHANGE_THIS_TO_A_RANDOM_SECRET_IN_PRODUCTION
+      - FEDERATION_SHARED_SECRET=CHANGE_THIS_CLUSTER_FEDERATION_SECRET
+      - NODE_SHARED_SECRET=CHANGE_THIS_CLUSTER_FEDERATION_SECRET
+      - FEDERATION_MOUNT_MODE=simulation
+      - ALLOW_SIMULATION_FALLBACK=1
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=admin123
       - FLASK_ENV=development
@@ -45,16 +44,20 @@ services:
 
   neighbor:
     build: ./backend
-    container_name: neighbor_node
     ports:
       - "5001:5000"
     volumes:
       - neighbor_data:/data
     environment:
       - NODE_ID=node-2
+      - RUNTIME_PROFILE=docker-dev
       - NODE_HOST=neighbor
       - NEIGHBOR_NODES=portal:5000
       - SECRET_KEY=CHANGE_THIS_TO_A_RANDOM_SECRET_IN_PRODUCTION
+      - FEDERATION_SHARED_SECRET=CHANGE_THIS_CLUSTER_FEDERATION_SECRET
+      - NODE_SHARED_SECRET=CHANGE_THIS_CLUSTER_FEDERATION_SECRET
+      - FEDERATION_MOUNT_MODE=simulation
+      - ALLOW_SIMULATION_FALLBACK=1
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=admin123
       - FLASK_ENV=development

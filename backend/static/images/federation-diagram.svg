@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+  <defs>
+    <style>
+      .node-circle { fill: #0d6efd; stroke: #0a58ca; stroke-width: 2; }
+      .node-text { font-size: 12px; fill: white; text-anchor: middle; dominant-baseline: central; font-weight: bold; }
+      .connection-line { stroke: #6c757d; stroke-width: 2; fill: none; }
+      .connection-arrow { stroke: #6c757d; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .lock-icon { fill: #198754; }
+      .title { font-size: 18px; fill: #0d6efd; font-weight: bold; }
+      .subtitle { font-size: 12px; fill: #6c757d; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#6c757d"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="200" y="25" class="title" text-anchor="middle">Federated Network Security</text>
+  <text x="200" y="42" class="subtitle" text-anchor="middle">Shamir Secret Sharing across Trusted Nodes</text>
+
+  <!-- Node 1 (Left) -->
+  <circle cx="80" cy="150" r="40" class="node-circle"/>
+  <text x="80" y="145" class="node-text">Node 1</text>
+  <text x="80" y="160" class="node-text" style="font-size: 10px;">Shard A</text>
+
+  <!-- Node 2 (Center) -->
+  <circle cx="200" cy="100" r="40" class="node-circle"/>
+  <text x="200" y="95" class="node-text">Node 2</text>
+  <text x="200" y="110" class="node-text" style="font-size: 10px;">Shard B</text>
+
+  <!-- Node 3 (Right) -->
+  <circle cx="320" cy="150" r="40" class="node-circle"/>
+  <text x="320" y="145" class="node-text">Node 3</text>
+  <text x="320" y="160" class="node-text" style="font-size: 10px;">Shard C</text>
+
+  <!-- Connection Lines -->
+  <line x1="110" y1="135" x2="170" y2="110" class="connection-line"/>
+  <line x1="110" y1="165" x2="170" y2="115" class="connection-line"/>
+  <line x1="230" y1="110" x2="290" y2="140" class="connection-line"/>
+  <line x1="230" y1="135" x2="280" y2="160" class="connection-line"/>
+
+  <!-- Master Key Result (Bottom) -->
+  <g transform="translate(200, 240)">
+    <rect x="-60" y="-20" width="120" height="40" rx="8" fill="#198754" opacity="0.1" stroke="#198754" stroke-width="2"/>
+    <text x="0" y="-5" class="node-text" style="fill: #198754; font-size: 12px;">Master Key</text>
+    <text x="0" y="10" class="node-text" style="fill: #198754; font-size: 10px;">Reconstructed ✓</text>
+  </g>
+
+  <!-- Info box -->
+  <rect x="10" y="260" width="380" height="35" rx="4" fill="#e7f3ff" stroke="#0d6efd" stroke-width="1"/>
+  <text x="20" y="278" style="font-size: 11px; fill: #0d6efd;">Each node holds one encrypted shard of the master key. When threshold is reached, the key is reconstructed securely.</text>
+</svg>

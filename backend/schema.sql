@@ -3,14 +3,23 @@
 -- Integrated project: Web Programming + System Security (Federated Filesystem)
 
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
-    username      TEXT     NOT NULL UNIQUE,
-    password_hash TEXT     NOT NULL,
-    email         TEXT,
-    role          TEXT     NOT NULL DEFAULT 'user',   -- 'admin' | 'user'
-    mac_address   TEXT,
-    is_active     INTEGER  NOT NULL DEFAULT 1,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id              INTEGER  PRIMARY KEY AUTOINCREMENT,
+    username        TEXT     NOT NULL UNIQUE,
+    password_hash   TEXT     NOT NULL,
+    email           TEXT,
+    role            TEXT     NOT NULL DEFAULT 'user',   -- 'admin' | 'user'
+    mac_address     TEXT,
+    is_active       INTEGER  NOT NULL DEFAULT 1,
+    first_name      TEXT,
+    last_name       TEXT,
+    avatar_url      TEXT,
+    profile_picture TEXT,                               -- filename of uploaded profile picture
+    phone_number    TEXT,
+    country         TEXT,
+    gender          TEXT,                               -- 'male' | 'female' | 'other' | null
+    birth_date      TEXT,                               -- YYYY-MM-DD format
+    birth_place     TEXT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS devices (
@@ -31,9 +40,27 @@ CREATE TABLE IF NOT EXISTS federation_nodes (
     ip_address    TEXT     NOT NULL,
     port          INTEGER  NOT NULL DEFAULT 5000,
     public_key    TEXT,
+    shared_secret TEXT,
     is_trusted    INTEGER  NOT NULL DEFAULT 0,
     last_seen     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS federation_nonce_log (
+    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
+    node_id       TEXT     NOT NULL,
+    nonce         TEXT     NOT NULL,
+    seen_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(node_id, nonce)
+);
+
+CREATE TABLE IF NOT EXISTS federation_trust_audit (
+    id            INTEGER  PRIMARY KEY AUTOINCREMENT,
+    endpoint      TEXT     NOT NULL,
+    node_id       TEXT     NOT NULL,
+    decision      TEXT     NOT NULL,              -- 'accepted' | 'rejected'
+    reason        TEXT,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS key_shards (

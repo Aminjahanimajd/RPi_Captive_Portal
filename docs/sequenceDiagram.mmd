@@ -1,0 +1,110 @@
+%%{init: {'theme':'base','themeVariables': {
+  'primaryTextColor': '#111111',
+  'lineColor': '#2b2b2b',
+  'noteTextColor': '#000000',
+  'noteBkgColor': '#fff7cc',
+  'noteBorderColor': '#c7a600',
+  'actorTextColor': '#111111'
+}}}%%
+sequenceDiagram
+    autonumber
+    participant RequestingNode as Requesting Federation Node
+    participant FederationApi as Federation API Endpoint
+    participant TrustLayer as Security Layer 1: Trust Boundary Check
+    participant ReplayLayer as Security Layer 2: Replay Protection Check
+    participant SignatureLayer as Security Layer 3: Signature Integrity Check
+    participant SecurityDatabase as SQLite Security Database
+    participant FederationCoordinator as Federation Coordination Service
+    participant EpochLayer as Security Layer 4: Epoch and Threshold Check
+    participant LuksMountLayer as Security Layer 5: Encrypted Mount Check
+    participant SecureFileApi as Secure File Access API
+
+    RequestingNode->>FederationApi: Submit payload with node_id, nonce, timestamp, signature, shard
+
+    FederationApi->>TrustLayer: Run trust boundary validation
+    alt Layer 1 PASS (sender trusted and no transitive fields)
+        rect rgba(221, 255, 227, 0.7)
+            Note over TrustLayer,FederationApi: PASS PATH - Trust check succeeded
+            TrustLayer-->>FederationApi: Pass
+        end
+    else Layer 1 REJECT
+        rect rgba(255, 224, 224, 0.7)
+            Note over TrustLayer,SecurityDatabase: REJECT PATH - Trust boundary violation
+            TrustLayer->>SecurityDatabase: Write trust rejection audit reason
+            FederationApi-->>RequestingNode: HTTP 403 Rejected at Trust Layer
+        end
+    end
+
+    FederationApi->>ReplayLayer: Run timestamp skew and nonce uniqueness checks
+    alt Layer 2 PASS (fresh timestamp and new nonce)
+        rect rgba(221, 255, 227, 0.7)
+            Note over ReplayLayer,SecurityDatabase: PASS PATH - Fresh timestamp and unique nonce
+            ReplayLayer->>SecurityDatabase: Store consumed nonce
+            ReplayLayer-->>FederationApi: Pass
+        end
+    else Layer 2 REJECT
+        rect rgba(255, 224, 224, 0.7)
+            Note over ReplayLayer,SecurityDatabase: REJECT PATH - Replay or stale timestamp
+            ReplayLayer->>SecurityDatabase: Write replay rejection audit reason
+            FederationApi-->>RequestingNode: HTTP 400 or 409 Rejected at Replay Layer
+        end
+    end
+
+    FederationApi->>SignatureLayer: Recompute canonical HMAC and compare constant-time
+    alt Layer 3 PASS (signature valid)
+        rect rgba(221, 255, 227, 0.7)
+            Note over SignatureLayer,SecurityDatabase: PASS PATH - Signature verified
+            SignatureLayer->>SecurityDatabase: Write signature pass audit entry
+            SignatureLayer-->>FederationApi: Pass
+        end
+    else Layer 3 REJECT
+        rect rgba(255, 224, 224, 0.7)
+            Note over SignatureLayer,SecurityDatabase: REJECT PATH - Invalid signature
+            SignatureLayer->>SecurityDatabase: Write signature rejection audit reason
+            FederationApi-->>RequestingNode: HTTP 401 Rejected at Signature Layer
+        end
+    end
+
+    FederationApi->>FederationCoordinator: Accept shard and continue processing
+    FederationCoordinator->>EpochLayer: Validate current epoch and threshold readiness
+    alt Layer 4 PASS (valid epoch and threshold met)
+        rect rgba(221, 255, 227, 0.7)
+            Note over EpochLayer,FederationCoordinator: PASS PATH - Epoch and threshold valid
+            EpochLayer-->>FederationCoordinator: Pass
+        end
+    else Layer 4 REJECT
+        rect rgba(255, 224, 224, 0.7)
+            Note over EpochLayer,SecurityDatabase: REJECT PATH - Epoch invalid or threshold not met
+            EpochLayer->>SecurityDatabase: Write epoch or threshold rejection reason
+            FederationCoordinator-->>FederationApi: Stop reconstruction
+            FederationApi-->>RequestingNode: HTTP 202 Accepted shard, waiting or invalid epoch state
+        end
+    end
+
+    FederationCoordinator->>LuksMountLayer: Reconstruct key and attempt encrypted mount
+    alt Layer 5 PASS (mount active)
+        rect rgba(221, 255, 227, 0.7)
+            Note over LuksMountLayer,FederationCoordinator: PASS PATH - Secure volume mounted
+            LuksMountLayer-->>FederationCoordinator: Pass
+            FederationCoordinator-->>FederationApi: Secure storage ready
+            FederationApi-->>RequestingNode: HTTP 200 Accepted and Ready
+        end
+    else Layer 5 REJECT
+        rect rgba(255, 224, 224, 0.7)
+            Note over LuksMountLayer,SecurityDatabase: REJECT PATH - Mount failed or fallback active
+            LuksMountLayer->>SecurityDatabase: Write mount failure audit reason
+            FederationCoordinator-->>FederationApi: Degraded mode or fallback
+            FederationApi-->>RequestingNode: HTTP 202 Accepted but Mount Not Ready
+        end
+    end
+
+    SecureFileApi->>LuksMountLayer: Verify mounted state before listing or download
+    alt File Access PASS
+        rect rgba(221, 255, 227, 0.7)
+            SecureFileApi-->>RequestingNode: Return secure files
+        end
+    else File Access REJECT
+        rect rgba(255, 224, 224, 0.7)
+            SecureFileApi-->>RequestingNode: Deny secure file access
+        end
+    end

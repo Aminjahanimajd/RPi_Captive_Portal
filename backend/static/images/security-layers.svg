@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 250" width="300" height="250">
+  <defs>
+    <style>
+      .lock-body { fill: #dc3545; stroke: #a71d2a; stroke-width: 2; }
+      .lock-shackle { fill: none; stroke: #dc3545; stroke-width: 3; stroke-linecap: round; }
+      .shield { fill: #198754; stroke: #145a32; stroke-width: 2; }
+      .checkmark { fill: white; stroke: white; stroke-width: 2; }
+      .title { font-size: 18px; fill: #333; font-weight: bold; }
+      .subtitle { font-size: 12px; fill: #666; }
+      .device-box { fill: #e8f5e9; stroke: #198754; stroke-width: 2; }
+      .device-text { font-size: 11px; fill: #1b5e20; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="150" y="25" class="title" text-anchor="middle">Secure Access Control</text>
+  <text x="150" y="42" class="subtitle" text-anchor="middle">Multi-Layer Protection</text>
+
+  <!-- Device 1 (Authorized) -->
+  <rect x="10" y="70" width="80" height="50" rx="6" class="device-box"/>
+  <text x="50" y="85" class="device-text">Device 1</text>
+  <text x="50" y="100" class="device-text" style="font-size: 10px;">✓ Authorized</text>
+
+  <!-- Arrow -->
+  <polygon points="95,95 85,90 85,100" fill="#198754"/>
+  <text x="105" y="100" style="font-size: 10px; fill: #666;">Verified</text>
+
+  <!-- Lock Shield -->
+  <g transform="translate(150, 95)">
+    <!-- Shield -->
+    <path class="shield" d="M -25 -20 L -25 0 Q -25 20 0 30 Q 25 20 25 0 L 25 -20 Z"/>
+    <!-- Checkmark inside shield -->
+    <polyline class="checkmark" points="-8,5 -2,12 15,-8" stroke-width="3" fill="none"/>
+  </g>
+
+  <!-- Arrow -->
+  <polygon points="200,95 210,90 210,100" fill="#198754"/>
+
+  <!-- Device 2 (Denied) -->
+  <rect x="210" y="70" width="80" height="50" rx="6" fill="#ffebee" stroke="#c62828" stroke-width="2"/>
+  <text x="250" y="85" class="device-text" style="fill: #b71c1c;">Device 2</text>
+  <text x="250" y="100" class="device-text" style="fill: #b71c1c; font-size: 10px;">✗ Blocked</text>
+
+  <!-- Layer boxes -->
+  <g transform="translate(30, 160)">
+    <rect width="75" height="35" rx="4" fill="#f3f3f3" stroke="#999" stroke-width="1"/>
+    <text x="37.5" y="12" style="font-size: 11px; fill: #333; text-anchor: middle; font-weight: bold;">Layer 1</text>
+    <text x="37.5" y="28" style="font-size: 9px; fill: #666; text-anchor: middle;">Authentication</text>
+  </g>
+
+  <g transform="translate(112, 160)">
+    <rect width="75" height="35" rx="4" fill="#f3f3f3" stroke="#999" stroke-width="1"/>
+    <text x="37.5" y="12" style="font-size: 11px; fill: #333; text-anchor: middle; font-weight: bold;">Layer 2</text>
+    <text x="37.5" y="28" style="font-size: 9px; fill: #666; text-anchor: middle;">Device Trust</text>
+  </g>
+
+  <g transform="translate(194, 160)">
+    <rect width="75" height="35" rx="4" fill="#f3f3f3" stroke="#999" stroke-width="1"/>
+    <text x="37.5" y="12" style="font-size: 11px; fill: #333; text-anchor: middle; font-weight: bold;">Layer 3</text>
+    <text x="37.5" y="28" style="font-size: 9px; fill: #666; text-anchor: middle;">Federation Ready</text>
+  </g>
+
+  <!-- Bottom info -->
+  <rect x="10" y="210" width="280" height="35" rx="4" fill="#fff3cd" stroke="#ffc107" stroke-width="1"/>
+  <text x="20" y="228" style="font-size: 11px; fill: #856404;">Access is only granted when all security layers pass. Invalid devices and unverified nodes are blocked.</text>
+</svg>
