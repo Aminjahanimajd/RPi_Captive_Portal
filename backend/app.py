@@ -378,17 +378,17 @@ def _build_secure_access_state() -> dict:
     layer1_pass = user is not None
     
     # Layer 2: Account Status - User account must be active
-    layer2_pass = layer1_pass and user.get("is_active", 0) == 1
+    layer2_pass = layer1_pass and user["is_active"] == 1
     
     # Layer 3: Device Authorization - Device must be explicitly approved
     device = None
     layer3_pass = False
-    if layer2_pass and user.get("mac_address"):
+    if layer2_pass and user["mac_address"]:
         device = db.execute(
             "SELECT * FROM devices WHERE mac_address = ?",
             (user["mac_address"],)
         ).fetchone()
-        layer3_pass = device is not None and device.get("is_authorized", 0) == 1
+        layer3_pass = device is not None and device["is_authorized"] == 1
     
     federation_state = federation.get_status()
     membership_state = membership.summary()
