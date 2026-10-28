@@ -5,7 +5,7 @@
 
 ## Repository Description
 
-Production-minded Raspberry Pi captive portal built with Flask, Docker, and SQLite, enhanced with federated key-shard exchange to gate secure filesystem access. The platform combines user/device access control, administrative operations, and encrypted storage lifecycle management in a single reproducible IoT security lab.
+Academic Raspberry Pi captive-portal project using Flask and SQLite for device registration and administration. A two-node Docker demo models federated key-shard exchange and simulates encrypted storage with an AES-GCM marker; a separate script documents LUKS partition setup on Raspberry Pi.
 
 ## Repository Topics
 
@@ -15,11 +15,10 @@ Production-minded Raspberry Pi captive portal built with Flask, Docker, and SQLi
 
 ## Overview
 
-This project implements a **WiFi captive portal** for IoT devices running on a Raspberry Pi.  
-Every device that connects to the Pi's hotspot is redirected to a login/register page before it
-can access the internet.  The same Pi participates in a **federated edge network** where the
-filesystem is LUKS-encrypted and can only be unlocked after the node collects cryptographic key
-shards from its trusted neighbours at boot time.
+This project contains a **WiFi captive portal** intended for a Raspberry Pi hotspot.  
+The hotspot and iptables scripts route connected devices to a Flask login/register page.
+The Docker demonstration models two-node key-shard exchange and an AES-GCM marker file.
+A separate Raspberry Pi script covers LUKS partition creation and mounting; the Docker demo does not mount a LUKS filesystem.
 
 ```
 Client device
@@ -90,7 +89,7 @@ Captive_Portal/
 
 | Requirement | Implementation |
 |---|---|
-| Encrypted filesystem (not accessible until boot federation) | LUKS AES-256 partition; demo uses AES-GCM marker |
+| Encrypted storage demonstration | Docker uses an AES-GCM marker; a separate Pi setup script covers a LUKS partition |
 | Edge federation — ask neighbours for key | `FederationAgent.bootstrap()` — POST to `/federation/provide-shard` |
 | Trusted neighbour communication | `federation_nodes` DB table; only `is_trusted=1` nodes can exchange shards |
 | Docker container-based | `Dockerfile` + `docker-compose.yml` (two-node setup) |
@@ -196,7 +195,7 @@ sudo bash scripts/mount_secure_fs.sh create
 | Frontend | Bootstrap 5 + Bootstrap Icons | Responsive, no build tooling required |
 | Containers | Docker + Compose | Reproducible deployment; multi-node demo |
 | Networking | hostapd + dnsmasq + iptables | Standard Raspberry Pi AP stack |
-| Filesystem encryption | LUKS (cryptsetup) | Full-disk AES-256 on the Pi |
+| Filesystem encryption | LUKS (cryptsetup) | Partition setup script for the Pi; not used by the Docker demo |
 
 ---
 
@@ -204,3 +203,4 @@ sudo bash scripts/mount_secure_fs.sh create
 
 See repository root for license details.  Datasets and dependencies are subject
 to their own licenses.
+
